@@ -54,12 +54,12 @@ jobs:
       - name: 2. Run Lint Code Quality Gate
         run: |
           echo "=== GATE 2: Android Lint Check ==="
-          ./gradlew lintDebug --stacktrace || gradle lintDebug
+          ./gradlew lint --stacktrace
 
       - name: 3. Run Unit Tests Gate
         run: |
           echo "=== GATE 3: Unit Tests Check ==="
-          ./gradlew testDebugUnitTest --stacktrace || gradle testDebugUnitTest
+          ./gradlew test --stacktrace
 
       - name: 4. Verify Signing Configuration & Prepare Keystore
         env:
@@ -90,7 +90,7 @@ jobs:
           VERSION_NAME: ${{ inputs.version_name || '1.0.0' }}
         run: |
           echo "=== GATE 5: Building Signed AAB & APK ==="
-          ./gradlew bundleRelease assembleRelease --stacktrace || gradle bundleRelease assembleRelease
+          ./gradlew bundleRelease assembleRelease --stacktrace
 
       - name: 6. Verify Signed AAB Artifact Gate
         run: |

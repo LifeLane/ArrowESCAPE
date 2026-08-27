@@ -1,26 +1,48 @@
-# Google Play App Signing & Keystore Configuration
+# Arrow Escape — Google Play Signing & Release Security Protocol
 
-This document describes the secure release architecture for **Arrow Escape** (`com.mitsara.arrowescape`).
+**Package Name:** `com.mitsara.arrowescape`  
+**Publisher:** Mitsara Games  
 
-## Keystore Architecture
+---
 
-Arrow Escape utilizes **Google Play App Signing**:
-1. **Google Play App Signing Key**: Managed securely in Google Cloud / Play Console.
-2. **Upload Keystore**: Used locally or in GitHub Actions to sign the AAB before uploading to Play Console.
+## 1. Overview
+This document details the signing pipeline and Google Play App Signing architecture for **Arrow Escape**.
 
-## Generating the Upload Keystore
+---
 
-Generate an upload key using keytool:
+## 2. Upload Keystore & Release Signing
 
-```bash
-keytool -genkey -v -keystore upload-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
-```
+The application release builds use a 2048-bit RSA upload key generated via `keytool`:
 
-## Configuring GitHub Secrets
+- **Key Alias:** `upload` (or configured via `RELEASE_KEY_ALIAS`)
+- **Keystore File:** `release.keystore`
+- **Validity:** 10,000 days (25+ years)
 
-For CI/CD automated release builds, set the following secrets in GitHub Repository Settings:
+---
 
-- `KEYSTORE_BASE64`: Base64 encoded content of `upload-key.jks`
-- `STORE_PASSWORD`: Keystore store password
-- `KEY_ALIAS`: Alias name (`upload`)
-- `KEY_PASSWORD`: Key password
+## 3. GitHub Secrets Pipeline
+
+Release builds are signed automatically in GitHub Actions using encrypted repository secrets:
+
+- `RELEASE_KEYSTORE_BASE64` — Base64-encoded string of `release.keystore`.
+- `RELEASE_KEYSTORE_PASSWORD` — Keystore store password.
+- `RELEASE_KEY_ALIAS` — Key alias.
+- `RELEASE_KEY_PASSWORD` — Key password.
+
+In `app/build.gradle.kts`, the `signingConfigs.release` block decodes the environment variables securely on the ephemeral GitHub runner.
+
+---
+
+## 4. Google Play App Signing Setup
+
+1. Log into Google Play Console → **Arrow Escape** → **Setup → App Integrity**.
+2. Opt into **Google Play App Signing**.
+3. Upload your initial signed AAB (`app-release.aab`).
+4. Google Play will register your `upload` key fingerprint and issue the final production app signing key stored safely in Google's cloud key management service.
+
+---
+
+## 5. Security & Key Backup Protocol
+
+- **Never Commit Secrets:** `.keystore`, `.jks`, `.p12`, `.pem`, and `.base64` files are strictly excluded via `.gitignore`.
+- **Encrypted Offline Backup:** Keep a backup of `release.keystore` and its passwords in an encrypted password vault and off-site drive.

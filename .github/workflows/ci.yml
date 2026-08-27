@@ -37,14 +37,20 @@ jobs:
           fi
           echo "Package identity verified: com.mitsara.arrowescape"
 
+      - name: Run Gradle Version Check
+        run: ./gradlew --version
+
+      - name: Run Clean
+        run: ./gradlew clean
+
       - name: Run Lint
-        run: ./gradlew lintDebug --stacktrace || gradle lintDebug
+        run: ./gradlew lintDebug --stacktrace
 
       - name: Run Unit Tests
-        run: ./gradlew testDebugUnitTest --stacktrace || gradle testDebugUnitTest
+        run: ./gradlew testDebugUnitTest --stacktrace
 
       - name: Build Debug APK
-        run: ./gradlew assembleDebug --stacktrace || gradle assembleDebug
+        run: ./gradlew assembleDebug --stacktrace
 
       - name: Upload Debug Artifacts
         uses: actions/upload-artifact@v4

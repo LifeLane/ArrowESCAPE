@@ -30,23 +30,21 @@ android {
         ?: "${rootDir}/release.keystore"
       
       val keystoreFile = file(keystorePath)
-      if (keystoreFile.exists()) {
+      val keystorePass = System.getenv("RELEASE_KEYSTORE_PASSWORD")
+        ?: System.getenv("STORE_PASSWORD")
+        ?: System.getenv("KEYSTORE_PASSWORD")
+      val keyAliasVal = System.getenv("RELEASE_KEY_ALIAS")
+        ?: System.getenv("KEY_ALIAS")
+        ?: "upload"
+      val keyPassVal = System.getenv("RELEASE_KEY_PASSWORD")
+        ?: System.getenv("KEY_PASSWORD")
+
+      if (keystoreFile.exists() && !keystorePass.isNullOrEmpty() && !keyPassVal.isNullOrEmpty()) {
         storeFile = keystoreFile
-        storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD")
-          ?: System.getenv("STORE_PASSWORD")
-          ?: System.getenv("KEYSTORE_PASSWORD")
-        keyAlias = System.getenv("RELEASE_KEY_ALIAS")
-          ?: System.getenv("KEY_ALIAS")
-          ?: "upload"
-        keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
-          ?: System.getenv("KEY_PASSWORD")
+        storePassword = keystorePass
+        keyAlias = keyAliasVal
+        keyPassword = keyPassVal
       }
-    }
-    create("debugConfig") {
-      storeFile = file("${rootDir}/debug.keystore")
-      storePassword = "android"
-      keyAlias = "androiddebugkey"
-      keyPassword = "android"
     }
   }
 
@@ -57,13 +55,22 @@ android {
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       
       val releaseSigning = signingConfigs.getByName("release")
-      if (releaseSigning.storeFile?.exists() == true) {
+      val storeFile = releaseSigning.storeFile
+      if (storeFile != null && storeFile.exists()) {
         signingConfig = releaseSigning
-      } else {
-        signingConfig = signingConfigs.getByName("debugConfig")
       }
     }
-    debug { signingConfig = signingConfigs.getByName("debugConfig") }
+    debug {
+      val rootDebugKeystore = file("${rootDir}/debug.keystore")
+      if (rootDebugKeystore.exists()) {
+        signingConfig = signingConfigs.create("rootDebug") {
+          storeFile = rootDebugKeystore
+          storePassword = "android"
+          keyAlias = "androiddebugkey"
+          keyPassword = "android"
+        }
+      }
+    }
   }
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11

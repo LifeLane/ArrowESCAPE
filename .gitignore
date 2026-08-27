@@ -16,3 +16,10 @@
 local.properties
 .env
 debug.keystore
+*.jks
+*.keystore
+*.p12
+*.pem
+*.base64
+service-account*.json
+release.keystore
