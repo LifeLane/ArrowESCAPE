@@ -4,25 +4,26 @@ on:
   push:
     tags:
       - 'v*.*.*'
+
   workflow_dispatch:
     inputs:
       version_name:
         description: 'Version Name (e.g. 1.0.0)'
         required: true
         default: '1.0.0'
+
       version_code:
         description: 'Version Code (e.g. 100)'
         required: true
         default: '100'
-      play_track:
-        description: 'Google Play Track (internal, alpha, beta, production)'
-        required: true
-        default: 'internal'
 
 jobs:
-  production-release-gate:
-    name: Release Gate & Signed AAB Build
+  production-release:
+    name: Build Signed AAB & Release APK
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout Repository
@@ -35,94 +36,179 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
-      - name: Grant Execute Permission for Gradle
-        run: chmod +x gradlew || true
-
-      - name: 1. Verify Package Identity Gate
+      - name: Verify Gradle Wrapper
         run: |
-          echo "=== GATE 1: Package Identity Check ==="
-          APP_ID=$(grep -E 'applicationId\s*=\s*"com.mitsara.arrowescape"' app/build.gradle.kts || true)
-          NAMESPACE=$(grep -E 'namespace\s*=\s*"com.mitsara.arrowescape"' app/build.gradle.kts || true)
-          MANIFEST_PKG=$(grep -E 'package="com.mitsara.arrowescape"' app/src/main/AndroidManifest.xml || true)
-          
-          if [ -z "$APP_ID" ] || [ -z "$NAMESPACE" ]; then
-            echo "::error:: Package identity gate failed! Expected applicationId and namespace: com.mitsara.arrowescape"
+          if [ ! -f "./gradlew" ]; then
+            echo "::error::gradlew was not found in the repository root."
             exit 1
           fi
-          echo "✔ Package Identity Verified: com.mitsara.arrowescape"
 
-      - name: 2. Run Lint Code Quality Gate
+          chmod +x ./gradlew
+          ./gradlew --version
+
+      - name: Verify Package Identity
         run: |
-          echo "=== GATE 2: Android Lint Check ==="
+          echo "Checking application identity..."
+
+          if ! grep -q 'applicationId.*com.mitsara.arrowescape' app/build.gradle.kts; then
+            echo "::error::Incorrect or missing applicationId."
+            exit 1
+          fi
+
+          if ! grep -q 'namespace.*com.mitsara.arrowescape' app/build.gradle.kts; then
+            echo "::error::Incorrect or missing namespace."
+            exit 1
+          fi
+
+          echo "Package identity verified:"
+          echo "com.mitsara.arrowescape"
+
+      - name: Run Lint
+        run: |
           ./gradlew lint --stacktrace
 
-      - name: 3. Run Unit Tests Gate
+      - name: Run Unit Tests
         run: |
-          echo "=== GATE 3: Unit Tests Check ==="
           ./gradlew test --stacktrace
 
-      - name: 4. Verify Signing Configuration & Prepare Keystore
+      - name: Verify Signing Secret
         env:
-          KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          echo "=== GATE 4: Signing Secrets Gate ==="
           if [ -z "$KEYSTORE_BASE64" ]; then
-            echo "::error:: RELEASE_KEYSTORE_BASE64 secret is missing! Keystore required for production signed release."
+            echo "::error::KEYSTORE_BASE64 GitHub Secret is missing."
             exit 1
           fi
-          
-          mkdir -p ${{ runner.temp }}/keystore
-          echo "$KEYSTORE_BASE64" | base64 -d > ${{ runner.temp }}/keystore/release.keystore
-          
-          if [ ! -s "${{ runner.temp }}/keystore/release.keystore" ]; then
-            echo "::error:: Failed to decode RELEASE_KEYSTORE_BASE64 into keystore file!"
-            exit 1
-          fi
-          echo "✔ Keystore decoded successfully to runner path."
 
-      - name: 5. Build Signed Release AAB & APK
+          echo "Signing secret detected."
+
+      - name: Decode Release Keystore
         env:
-          KEYSTORE_PATH: ${{ runner.temp }}/keystore/release.keystore
-          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
-          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
-          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
-          VERSION_CODE: ${{ inputs.version_code || github.run_number }}
-          VERSION_NAME: ${{ inputs.version_name || '1.0.0' }}
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          echo "=== GATE 5: Building Signed AAB & APK ==="
-          ./gradlew bundleRelease assembleRelease --stacktrace
+          mkdir -p "$RUNNER_TEMP/arrowescape"
 
-      - name: 6. Verify Signed AAB Artifact Gate
-        run: |
-          echo "=== GATE 6: Signed AAB Artifact Verification ==="
-          AAB_PATH="app/build/outputs/bundle/release/app-release.aab"
-          if [ ! -f "$AAB_PATH" ]; then
-            echo "::error:: AAB Generation failed! File not found at $AAB_PATH"
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/arrowescape/arrowescape-release.jks"
+
+          if [ ! -s "$RUNNER_TEMP/arrowescape/arrowescape-release.jks" ]; then
+            echo "::error::Failed to decode release keystore."
             exit 1
           fi
-          
-          FILE_SIZE=$(stat -c%s "$AAB_PATH" 2>/dev/null || stat -f%z "$AAB_PATH")
-          if [ "$FILE_SIZE" -lt 100000 ]; then
-            echo "::error:: Generated AAB size ($FILE_SIZE bytes) is suspiciously small!"
+
+          echo "Release keystore decoded successfully."
+
+      - name: Verify Keystore Alias
+        env:
+          KEYSTORE_PATH: ${{ runner.temp }}/arrowescape/arrowescape-release.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          if [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "::error::KEYSTORE_PASSWORD is missing."
             exit 1
           fi
-          
-          echo "✔ Signed AAB generated successfully ($FILE_SIZE bytes)."
 
-      - name: 7. Upload Release Artifacts (AAB & APK)
+          if [ -z "$KEY_ALIAS" ]; then
+            echo "::error::KEY_ALIAS is missing."
+            exit 1
+          fi
+
+          keytool -list \
+            -keystore "$KEYSTORE_PATH" \
+            -storepass "$KEYSTORE_PASSWORD" \
+            -alias "$KEY_ALIAS" \
+            >/dev/null
+
+          echo "Release keystore and alias verified."
+
+      - name: Build Signed Release AAB
+        env:
+          KEYSTORE_PATH: ${{ runner.temp }}/arrowescape/arrowescape-release.jks
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          ./gradlew bundleRelease --stacktrace
+
+      - name: Build Signed Release APK
+        env:
+          KEYSTORE_PATH: ${{ runner.temp }}/arrowescape/arrowescape-release.jks
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          ./gradlew assembleRelease --stacktrace
+
+      - name: Verify AAB
+        run: |
+          AAB="app/build/outputs/bundle/release/app-release.aab"
+
+          if [ ! -f "$AAB" ]; then
+            echo "::error::Release AAB was not generated."
+            exit 1
+          fi
+
+          SIZE=$(stat -c%s "$AAB")
+
+          if [ "$SIZE" -lt 100000 ]; then
+            echo "::error::AAB appears invalid or suspiciously small."
+            exit 1
+          fi
+
+          echo "Release AAB verified: $SIZE bytes."
+
+      - name: Verify Release APK
+        run: |
+          APK="app/build/outputs/apk/release/app-release.apk"
+
+          if [ ! -f "$APK" ]; then
+            echo "::error::Release APK was not generated."
+            exit 1
+          fi
+
+          SIZE=$(stat -c%s "$APK")
+
+          if [ "$SIZE" -lt 100000 ]; then
+            echo "::error::Release APK appears invalid or suspiciously small."
+            exit 1
+          fi
+
+          echo "Release APK verified: $SIZE bytes."
+
+      - name: Upload Play Store AAB
         uses: actions/upload-artifact@v4
         with:
-          name: arrow-escape-signed-release-v${{ inputs.version_name || '1.0.0' }}-b${{ inputs.version_code || github.run_number }}
-          path: |
-            app/build/outputs/bundle/release/app-release.aab
-            app/build/outputs/apk/release/app-release.apk
+          name: arrowescape-playstore-aab
+          path: app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
 
-      - name: 8. Deploy to Google Play Console
-        if: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
-        uses: rstudio/actions-google-play-publish@v1
+      - name: Upload Release APK
+        uses: actions/upload-artifact@v4
         with:
-          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: com.mitsara.arrowescape
-          aabFile: app/build/outputs/bundle/release/app-release.aab
-          track: ${{ inputs.play_track || 'internal' }}
-          whatsNewDirectory: distribution/release-notes
+          name: arrowescape-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+
+      - name: Cleanup Signing Key
+        if: always()
+        run: |
+          rm -f "$RUNNER_TEMP/arrowescape/arrowescape-release.jks"
+
+      - name: Release Summary
+        if: success()
+        run: |
+          echo "=========================================="
+          echo "ARROW ESCAPE RELEASE BUILD SUCCESSFUL"
+          echo "=========================================="
+          echo ""
+          echo "Application ID:"
+          echo "com.mitsara.arrowescape"
+          echo ""
+          echo "Play Store AAB:"
+          echo "app-release.aab"
+          echo ""
+          echo "Release APK:"
+          echo "app-release.apk"
+          echo ""
+          echo "Both artifacts are available in GitHub Actions."
+          echo "=========================================="
