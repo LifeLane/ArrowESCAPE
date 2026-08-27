@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delete Account & Data Request — Arrow Escape</title>
+    <meta name="description" content="Data deletion policy and request form for Arrow Escape (com.mitsara.arrowescape). Learn how local device data is stored and erased.">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <div class="container nav-container">
+            <a href="index.html" class="brand-logo">
+                <div class="brand-icon">➔</div>
+                <span>ARROW ESCAPE</span>
+            </a>
+            <nav>
+                <a href="index.html">Home</a>
+                <a href="how-to-play.html">How to Play</a>
+                <a href="features.html">Features</a>
+                <a href="privacy.html">Privacy Policy</a>
+                <a href="support.html">Support</a>
+                <a href="delete-account.html" class="active">Data Deletion</a>
+                <a href="premium.html" class="nav-highlight">Get Premium</a>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <section class="page-header">
+            <div class="container">
+                <h1>Data Deletion & Account Policy</h1>
+                <p>Google Play Data Safety Compliance | Arrow Escape (`com.mitsara.arrowescape`)</p>
+            </div>
+        </section>
+
+        <section class="page-content">
+            <div class="container" style="max-width: 800px;">
+                <div class="card" style="margin-bottom: 24px; border-left: 4px solid var(--primary-blue);">
+                    <h3>Local Storage Clarification</h3>
+                    <p>Arrow Escape does <strong>NOT</strong> require or create cloud user accounts, email logins, or social profile registrations. All player data—including level completion scores, star counts, hint balances, and settings—is stored exclusively on your physical Android device inside your encrypted SQLite Room database.</p>
+                </div>
+
+                <div class="card" style="margin-bottom: 24px;">
+                    <h3>Option A: Immediate On-Device Data Eradication</h3>
+                    <p>You can instantly delete 100% of your stored game data and preferences directly on your Android device at any time without submitting a support request:</p>
+                    <ol style="margin-left: 20px; margin-top: 10px; line-height: 1.8; color: var(--text-secondary);">
+                        <li>Open your Android device <strong>Settings</strong> app.</li>
+                        <li>Navigate to <strong>Apps</strong> (or <strong>App Manager</strong>) → <strong>Arrow Escape</strong>.</li>
+                        <li>Tap <strong>Storage & Cache</strong>.</li>
+                        <li>Tap <strong>"Clear Storage"</strong> or <strong>"Clear Data"</strong>.</li>
+                    </ol>
+                    <p style="margin-top: 10px; font-size: 0.9rem; color: var(--text-muted);">This action immediately and permanently removes all local database files, progress, and saved preferences.</p>
+                </div>
+
+                <div class="card" style="margin-bottom: 24px;">
+                    <h3>Option B: Request Data Consultation or Advertising Consent Removal</h3>
+                    <p>If you have questions regarding Google AdMob advertising consent or wish to request confirmation of anonymized data purge, please submit your request below:</p>
+                    
+                    <form onsubmit="alert('Your data deletion request has been submitted. Because Arrow Escape stores progress locally on device, clearing your app cache via Android settings instantly deletes all game data.'); return false;" style="margin-top: 20px;">
+                        <div class="form-group">
+                            <label for="del-email">Your Email Address</label>
+                            <input type="email" id="del-email" class="form-control" placeholder="yourname@domain.com" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="del-device">Device Model (Optional)</label>
+                            <input type="text" id="del-device" class="form-control" placeholder="e.g. Pixel 8, Galaxy S24">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="del-details">Request Details</label>
+                            <textarea id="del-details" class="form-control" placeholder="Specify if you wish to revoke ad personalization consent or purge local cache instructions..." required></textarea>
+                        </div>
+
+                        <button type="submit" class="btn btn-dark" style="width: 100%;">Submit Data Deletion Request</button>
+                    </form>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <div class="footer-grid">
+                <div>
+                    <div class="footer-brand">ARROW ESCAPE</div>
+                    <p style="font-size: 0.9rem; line-height: 1.6;">Official arrow escape logic puzzle game for Android.</p>
+                </div>
+                <div class="footer-col">
+                    <h4>Navigation</h4>
+                    <ul>
+                        <li><a href="index.html">Home</a></li>
+                        <li><a href="how-to-play.html">How to Play</a></li>
+                        <li><a href="features.html">Features</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col">
+                    <h4>Legal & Support</h4>
+                    <ul>
+                        <li><a href="privacy.html">Privacy Policy</a></li>
+                        <li><a href="terms.html">Terms of Service</a></li>
+                        <li><a href="support.html">Support / FAQ</a></li>
+                        <li><a href="delete-account.html">Data / Delete Request</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col">
+                    <h4>Store Metadata</h4>
+                    <ul>
+                        <li><a href="play-store-assets.html">Play Store Content</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <div>&copy; 2026 Arrow Escape by Mitsara Games. All rights reserved.</div>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

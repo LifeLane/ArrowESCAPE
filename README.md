@@ -1,11 +1,29 @@
-<div align="center">
+# Arrow Escape — Android Puzzle Game
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+**Arrow Escape** (`com.mitsara.arrowescape`) is a production-ready Android puzzle game built with Kotlin, Jetpack Compose, Room Database, and Material 3.
 
-  <h1>Built with AI Studio</h2>
+## Core Gameplay
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+- **TAP AN UNOBSTRUCTED ARROW**
+- **ARROW ESCAPES THE BOARD**
+- **BOARD SPACE BECOMES CLEAR**
+- **OTHER ARROWS BECOME UNBLOCKED**
+- **REPEAT UNTIL THE BOARD IS EMPTY**
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+## Architecture
 
-</div>
+- **UI**: Jetpack Compose, Material Design 3, Smooth Canvas & Scale Animations
+- **Game Engine**: Deterministic `PuzzleSolver` with BFS backtracking and solvability validation
+- **Storage**: Room Local Persistence for level progress, stars, and user settings
+- **Monetization Abstraction**: AdMob & RevenueCat premium entitlement interfaces
+- **Testing**: JUnit Unit Tests & Robolectric JVM testing
+
+## Build & Run
+
+```bash
+# Run unit tests
+gradle testDebugUnitTest
+
+# Assemble debug APK
+gradle assembleDebug
+```

@@ -1,0 +1,6 @@
+{
+  "name": "Arrow Escape",
+  "description": "A sleek, satisfying arrow escape puzzle game where players clear the board by tapping unobstructed arrows.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
