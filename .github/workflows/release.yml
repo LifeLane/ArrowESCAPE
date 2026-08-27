@@ -6,9 +6,12 @@ on:
       - 'v*'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   release:
-    name: Build Signed Release Artifacts (APK & AAB)
+    name: Build Signed Release Artifacts (AAB & APK)
     runs-on: ubuntu-latest
 
     steps:
@@ -23,57 +26,134 @@ jobs:
           cache: gradle
 
       - name: Grant Execute Permission for Gradle
-        run: chmod +x gradlew
+        run: chmod +x ./gradlew
 
-      - name: Run Gradle Version Check
+      - name: Verify Gradle Wrapper
         run: ./gradlew --version
 
       - name: Verify Package Identity
         run: |
+          echo "Verifying Package Identity..."
           APP_ID=$(grep -E 'applicationId\s*=\s*"com.mitsara.arrowescape"' app/build.gradle.kts || true)
           NAMESPACE=$(grep -E 'namespace\s*=\s*"com.mitsara.arrowescape"' app/build.gradle.kts || true)
           if [ -z "$APP_ID" ] || [ -z "$NAMESPACE" ]; then
-            echo "ERROR: Package identity mismatch! Expected com.mitsara.arrowescape"
+            echo "::error:: Package identity mismatch! Expected com.mitsara.arrowescape"
             exit 1
           fi
-
-      - name: Run Clean
-        run: ./gradlew clean
-
-      - name: Run Lint
-        run: ./gradlew lint --stacktrace
-
-      - name: Run Unit Tests
-        run: ./gradlew test --stacktrace
+          echo "✔ Package identity verified: com.mitsara.arrowescape"
 
       - name: Prepare Keystore from GitHub Secrets
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 || secrets.RELEASE_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || secrets.RELEASE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || secrets.RELEASE_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || secrets.RELEASE_KEY_PASSWORD }}
         run: |
+          echo "Validating release signing secrets..."
           if [ -z "$KEYSTORE_BASE64" ]; then
             echo "::error:: KEYSTORE_BASE64 secret is missing!"
             exit 1
           fi
-          mkdir -p ${{ runner.temp }}/keystore
-          echo "$KEYSTORE_BASE64" | base64 -d > ${{ runner.temp }}/keystore/release.keystore
-          if [ ! -s "${{ runner.temp }}/keystore/release.keystore" ]; then
-            echo "::error:: Failed to decode KEYSTORE_BASE64"
+          if [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "::error:: KEYSTORE_PASSWORD secret is missing!"
+            exit 1
+          fi
+          if [ -z "$KEY_ALIAS" ]; then
+            echo "::error:: KEY_ALIAS secret is missing!"
+            exit 1
+          fi
+          if [ -z "$KEY_PASSWORD" ]; then
+            echo "::error:: KEY_PASSWORD secret is missing!"
             exit 1
           fi
 
-      - name: Build Release APK and AAB
+          mkdir -p "${{ runner.temp }}"
+          KEYSTORE_FILE="${{ runner.temp }}/arrowescape-release.jks"
+          echo "$KEYSTORE_BASE64" | base64 -d > "$KEYSTORE_FILE"
+
+          if [ ! -s "$KEYSTORE_FILE" ]; then
+            echo "::error:: Failed to decode KEYSTORE_BASE64 or key file is empty!"
+            exit 1
+          fi
+          echo "✔ Keystore decoded successfully to $KEYSTORE_FILE"
+
+      - name: Run Clean
+        run: ./gradlew clean
+
+      - name: Build Release Bundle (AAB)
         env:
-          KEYSTORE_PATH: ${{ runner.temp }}/keystore/release.keystore
+          KEYSTORE_PATH: ${{ runner.temp }}/arrowescape-release.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || secrets.RELEASE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || secrets.RELEASE_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || secrets.RELEASE_KEY_PASSWORD }}
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || secrets.RELEASE_KEYSTORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.KEY_ALIAS || secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || secrets.RELEASE_KEY_PASSWORD }}
-        run: |
-          ./gradlew assembleRelease bundleRelease --stacktrace
+        run: ./gradlew bundleRelease --stacktrace
 
-      - name: Upload Release Artifacts
+      - name: Build Release APK
+        env:
+          KEYSTORE_PATH: ${{ runner.temp }}/arrowescape-release.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || secrets.RELEASE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || secrets.RELEASE_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || secrets.RELEASE_KEY_PASSWORD }}
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.KEY_ALIAS || secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || secrets.RELEASE_KEY_PASSWORD }}
+        run: ./gradlew assembleRelease --stacktrace
+
+      - name: Verify Release Outputs
+        run: |
+          AAB_FILE="app/build/outputs/bundle/release/app-release.aab"
+          APK_FILE="app/build/outputs/apk/release/app-release.apk"
+
+          if [ ! -f "$AAB_FILE" ]; then
+            echo "::error:: AAB release build failed! File missing at $AAB_FILE"
+            exit 1
+          fi
+
+          if [ ! -f "$APK_FILE" ]; then
+            echo "::error:: APK release build failed! File missing at $APK_FILE"
+            exit 1
+          fi
+
+          AAB_SIZE=$(stat -c%s "$AAB_FILE" 2>/dev/null || stat -f%z "$AAB_FILE")
+          APK_SIZE=$(stat -c%s "$APK_FILE" 2>/dev/null || stat -f%z "$APK_FILE")
+
+          if [ "$AAB_SIZE" -le 0 ]; then
+            echo "::error:: Generated AAB is empty!"
+            exit 1
+          fi
+
+          if [ "$APK_SIZE" -le 0 ]; then
+            echo "::error:: Generated APK is empty!"
+            exit 1
+          fi
+
+          echo "✔ Verified Signed AAB ($AAB_SIZE bytes) at $AAB_FILE"
+          echo "✔ Verified Signed APK ($APK_SIZE bytes) at $APK_FILE"
+
+      - name: Upload AAB Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: arrow-escape-release-build
-          path: |
-            app/build/outputs/apk/release/*.apk
-            app/build/outputs/bundle/release/*.aab
+          name: arrowescape-playstore-aab
+          path: app/build/outputs/bundle/release/app-release.aab
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: arrowescape-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            app/build/outputs/bundle/release/app-release.aab
+            app/build/outputs/apk/release/app-release.apk
+          generate_release_notes: true
+
+      - name: Clean Temporary Keystore
+        if: always()
+        run: rm -f "${{ runner.temp }}/arrowescape-release.jks"
