@@ -1,0 +1,9 @@
+Welcome to Arrow Escape v1.0.0!
+
+• 500+ Hand-crafted & procedurally generated logic puzzle levels.
+• 100% Solvable board verification engine powered by BFS solver.
+• Daily Calendar Challenges with streak tracking & star rewards.
+• 4 Custom Visual Themes (Classic Light, Midnight Dark, Cyber Neon, Warm Wood).
+• Ad-Free Premium Unlock & instant purchase restoration.
+• Dynamic audio synthesizer with tactile launch sound effects.
+• Offline-first Room database persistence.
