@@ -1,39 +1,50 @@
-name: Arrow Escape Website Deployment
+name: Deploy Website to GitHub Pages
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
     paths:
       - 'website/**'
+      - '.github/workflows/website.yml'
+
   workflow_dispatch:
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
 jobs:
-  website-validation:
-    name: Validate and Deploy Website Assets
+  deploy:
+    name: Build and Deploy Website
     runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Validate HTML Structure
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Prepare Website
         run: |
-          echo "Validating HTML & CSS files in /website directory..."
-          test -f website/index.html
-          test -f website/how-to-play.html
-          test -f website/features.html
-          test -f website/game-modes.html
-          test -f website/premium.html
-          test -f website/support.html
-          test -f website/contact.html
-          test -f website/privacy.html
-          test -f website/terms.html
-          test -f website/sitemap.xml
-          test -f website/robots.txt
-          echo "✔ All website static files present and validated."
+          mkdir -p _site
+          cp -R website/. _site/
 
       - name: Upload Website Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-pages-artifact@v3
         with:
-          name: arrow-escape-website-dist
-          path: website/
+          path: ./_site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
