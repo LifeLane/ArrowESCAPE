@@ -22,7 +22,7 @@ import com.mitsara.arrowescape.ui.screens.AboutPrivacyScreen
 import com.mitsara.arrowescape.ui.screens.CosmeticStoreScreen
 import com.mitsara.arrowescape.ui.screens.DailyChallengeScreen
 import com.mitsara.arrowescape.ui.screens.GameplayScreen
-import com.mitsara.arrowescape.ui.screens.LevelSelectScreen
+import com.mitsara.arrowescape.ui.screens.PhaseRoadmapScreen
 import com.mitsara.arrowescape.ui.screens.MainMenuScreen
 import com.mitsara.arrowescape.ui.screens.PremiumScreen
 import com.mitsara.arrowescape.ui.screens.SettingsScreen
@@ -115,7 +115,7 @@ fun ArrowEscapeApp(viewModel: GameViewModel) {
             )
         }
         is Screen.LevelSelect -> {
-            LevelSelectScreen(
+            PhaseRoadmapScreen(
                 currentLevelId = userSettings.currentLevelId,
                 completedLevels = completedLevels,
                 levelProgressMap = levelProgressMap,

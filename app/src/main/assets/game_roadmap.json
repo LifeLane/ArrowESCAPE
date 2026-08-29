@@ -1,0 +1,117 @@
+{
+  "totalPhases": 10,
+  "levelsPerPhase": 50,
+  "totalLevels": 500,
+  "phases": [
+    {
+      "phaseId": 1,
+      "title": "The Awakening",
+      "subtitle": "Classic Orthogonal Sliders",
+      "startLevel": 1,
+      "endLevel": 50,
+      "gridSizeRange": [3, 4],
+      "difficultyMultiplier": 1.0,
+      "primaryColor": "#3B82F6",
+      "secondaryColor": "#1D4ED8"
+    },
+    {
+      "phaseId": 2,
+      "title": "Neon Lattice",
+      "subtitle": "Multi-segment L-Arrows",
+      "startLevel": 51,
+      "endLevel": 100,
+      "gridSizeRange": [4, 5],
+      "difficultyMultiplier": 1.2,
+      "primaryColor": "#06B6D4",
+      "secondaryColor": "#0E7490"
+    },
+    {
+      "phaseId": 3,
+      "title": "Cyber Labyrinth",
+      "subtitle": "Stationary Steel Barriers",
+      "startLevel": 101,
+      "endLevel": 150,
+      "gridSizeRange": [5, 5],
+      "difficultyMultiplier": 1.4,
+      "primaryColor": "#8B5CF6",
+      "secondaryColor": "#6D28D9"
+    },
+    {
+      "phaseId": 4,
+      "title": "Quantum Core",
+      "subtitle": "Directional Gate Locks",
+      "startLevel": 151,
+      "endLevel": 200,
+      "gridSizeRange": [5, 6],
+      "difficultyMultiplier": 1.6,
+      "primaryColor": "#EC4899",
+      "secondaryColor": "#BE185D"
+    },
+    {
+      "phaseId": 5,
+      "title": "Zenith Spire",
+      "subtitle": "Cascading Multi-directional Paths",
+      "startLevel": 201,
+      "endLevel": 250,
+      "gridSizeRange": [6, 6],
+      "difficultyMultiplier": 1.8,
+      "primaryColor": "#F59E0B",
+      "secondaryColor": "#B45309"
+    },
+    {
+      "phaseId": 6,
+      "title": "Synthwave Horizon",
+      "subtitle": "Synchronized Switches",
+      "startLevel": 251,
+      "endLevel": 300,
+      "gridSizeRange": [6, 7],
+      "difficultyMultiplier": 2.0,
+      "primaryColor": "#10B981",
+      "secondaryColor": "#047857"
+    },
+    {
+      "phaseId": 7,
+      "title": "Amethyst Void",
+      "subtitle": "High-density Obstacles",
+      "startLevel": 301,
+      "endLevel": 350,
+      "gridSizeRange": [7, 7],
+      "difficultyMultiplier": 2.2,
+      "primaryColor": "#6366F1",
+      "secondaryColor": "#4338CA"
+    },
+    {
+      "phaseId": 8,
+      "title": "Starlight Nexus",
+      "subtitle": "Serpent Arrows & Modifiers",
+      "startLevel": 351,
+      "endLevel": 400,
+      "gridSizeRange": [7, 8],
+      "difficultyMultiplier": 2.5,
+      "primaryColor": "#14B8A6",
+      "secondaryColor": "#0F766E"
+    },
+    {
+      "phaseId": 9,
+      "title": "Astral Dimension",
+      "subtitle": "Maximum Occlusion Thresholds",
+      "startLevel": 401,
+      "endLevel": 450,
+      "gridSizeRange": [8, 8],
+      "difficultyMultiplier": 2.8,
+      "primaryColor": "#F97316",
+      "secondaryColor": "#C2410C"
+    },
+    {
+      "phaseId": 10,
+      "title": "Nirvana Singularity",
+      "subtitle": "Master-Tier Ultimate Escape",
+      "startLevel": 451,
+      "endLevel": 500,
+      "gridSizeRange": [8, 9],
+      "difficultyMultiplier": 3.2,
+      "primaryColor": "#8B5CF6",
+      "secondaryColor": "#4C1D95"
+    }
+  ]
+}

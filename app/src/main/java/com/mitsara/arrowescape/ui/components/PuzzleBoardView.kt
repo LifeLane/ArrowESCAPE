@@ -7,6 +7,8 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -42,6 +44,7 @@ import com.mitsara.arrowescape.engine.PuzzleSolver
 import com.mitsara.arrowescape.model.Arrow
 import com.mitsara.arrowescape.model.Direction
 import com.mitsara.arrowescape.model.GameTheme
+import com.mitsara.arrowescape.model.ThemeManager
 import com.mitsara.arrowescape.model.GridPoint
 
 class EscapeParticle(var x: Float, var y: Float, var vx: Float, var vy: Float, var life: Float)
@@ -57,7 +60,7 @@ fun PuzzleBoardView(
     isMistakeShake: Boolean,
     inspectedArrowId: Int? = null,
     onArrowClick: (Int) -> Unit,
-    theme: GameTheme = GameTheme.LIGHT,
+    theme: GameTheme = ThemeManager.RETRO_ARCADE,
     validCells: Set<GridPoint>? = null,
     obstacles: Set<GridPoint> = emptySet(),
     modifier: Modifier = Modifier
@@ -96,7 +99,10 @@ fun PuzzleBoardView(
             escapeProgress.snapTo(0f)
             escapeProgress.animateTo(
                 targetValue = 1.0f,
-                animationSpec = tween(durationMillis = 220, easing = LinearEasing)
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = 180f
+                )
             )
             
             // Generate particles at tip when animation finishes

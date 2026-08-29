@@ -95,10 +95,13 @@ class GameRepository(private val dao: GameDao) {
 
     suspend fun checkDailyStreak() {
         val current = dao.getUserSettingsDirect() ?: UserSettingsEntity()
-        val today = java.time.LocalDate.now().toString()
+        val dateFormat = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+        val calendar = java.util.Calendar.getInstance()
+        val today = dateFormat.format(calendar.time)
         if (current.lastDailyCompletedDate == today) return
 
-        val yesterday = java.time.LocalDate.now().minusDays(1).toString()
+        calendar.add(java.util.Calendar.DAY_OF_YEAR, -1)
+        val yesterday = dateFormat.format(calendar.time)
         val newStreak = if (current.lastDailyCompletedDate == yesterday) current.dailyStreak + 1 else 1
         val bonusHints = if (newStreak % 3 == 0) 3 else 1
 

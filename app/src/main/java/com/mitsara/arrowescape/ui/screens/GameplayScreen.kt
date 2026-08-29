@@ -1,24 +1,33 @@
 package com.mitsara.arrowescape.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -27,9 +36,24 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.platform.testTag
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.ButtonDefaults
 import com.mitsara.arrowescape.engine.LevelTextEngine
 import com.mitsara.arrowescape.model.GamePlayState
 import com.mitsara.arrowescape.model.GameTheme
+import com.mitsara.arrowescape.model.ThemeManager
 import com.mitsara.arrowescape.monetization.AdsManager
 import com.mitsara.arrowescape.ui.components.GameBottomBar
 
@@ -39,6 +63,7 @@ import com.mitsara.arrowescape.ui.components.LevelFailedDialog
 import com.mitsara.arrowescape.ui.components.PuzzleBoardView
 import com.mitsara.arrowescape.ui.theme.SurfaceLight
 import com.mitsara.arrowescape.ui.viewmodel.GameViewModel
+import kotlinx.coroutines.delay
 
 @Composable
 fun GameplayScreen(
@@ -52,6 +77,16 @@ fun GameplayScreen(
     val gameState by viewModel.gameState.collectAsState()
     val userSettings by viewModel.userSettings.collectAsState()
 
+    var showControlsOverlay by remember { mutableStateOf(true) }
+
+    // Auto-hide controls after 3 seconds of inactivity
+    LaunchedEffect(showControlsOverlay) {
+        if (showControlsOverlay) {
+            delay(3500)
+            showControlsOverlay = false
+        }
+    }
+
     val wipeProgress = remember { androidx.compose.animation.core.Animatable(0f) }
     LaunchedEffect(levelId) {
         if (gameState?.level?.id != levelId) {
@@ -63,7 +98,7 @@ fun GameplayScreen(
 
     val state = gameState ?: return
     val context = LocalContext.current
-    val activeTheme = GameTheme.fromId(userSettings.selectedTheme)
+    val activeTheme = ThemeManager.getTheme(userSettings.selectedTheme)
 
     LaunchedEffect(state.isCompleted) {
         if (state.isCompleted) {
@@ -71,125 +106,215 @@ fun GameplayScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Scaffold(
-            containerColor = activeTheme.surfaceBackgroundColor,
-            topBar = {
-                GameTopBar(
-                    levelNumber = state.level.id,
-                    difficulty = state.level.difficulty,
-                    remainingLives = state.remainingLives,
-                    remainingArrowsCount = state.activeArrows.size,
-                    onBackClick = onBackClick,
-                    onSettingsClick = onSettingsClick
-                )
-            },
-            bottomBar = {
-                GameBottomBar(
-                    hintsAvailable = state.hintsAvailable,
-                    isPremium = userSettings.isPremium,
-                    canUndo = state.canUndo,
-                    onUndoClick = { viewModel.undoMove() },
-                    onHintClick = { viewModel.requestHint() },
-                    onRetryClick = { viewModel.retryLevel() },
-                    onGetMoreHintsClick = { viewModel.addRewardHints(3) }
-                )
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clickable(
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() }
+            ) {
+                showControlsOverlay = true
             }
-        ) { paddingValues ->
-            // Procedural Background
-            com.mitsara.arrowescape.engine.graphics.BackgroundEngine(
-                theme = activeTheme,
-                flowState = state.flowState
-            )
+    ) {
+        // Procedural Immersive Background Engine
+        com.mitsara.arrowescape.engine.graphics.BackgroundEngine(
+            theme = activeTheme,
+            flowState = state.flowState
+        )
 
+        // Full Screen Centered Game Board (Occupies entire screen behind transparent overlay)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.systemBars),
+            contentAlignment = Alignment.Center
+        ) {
+            PuzzleBoardView(
+                gridWidth = state.level.gridWidth,
+                gridHeight = state.level.gridHeight,
+                activeArrows = state.activeArrows,
+                animatingArrowId = state.animatingArrowId,
+                animatingDirection = state.animatingDirection,
+                hintArrowId = state.hintArrowId,
+                isMistakeShake = state.isMistakeShake,
+                inspectedArrowId = state.inspectedArrowId,
+                onArrowClick = { arrowId ->
+                    showControlsOverlay = true
+                    viewModel.onArrowTapped(arrowId)
+                },
+                theme = activeTheme,
+                validCells = state.level.validCells,
+                obstacles = state.level.obstacles,
+                modifier = Modifier.fillMaxWidth().padding(16.dp)
+            )
+        }
+
+        // Transparent Auto-Hiding Controls Overlay using WindowInsets
+        AnimatedVisibility(
+            visible = showControlsOverlay,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.fillMaxSize()
+        ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues)
-                    .padding(horizontal = 20.dp),
-                contentAlignment = Alignment.Center
+                    .windowInsetsPadding(WindowInsets.systemBars)
+                    .background(Color.Black.copy(alpha = 0.2f))
+                    .padding(horizontal = 16.dp, vertical = 20.dp),
+                contentAlignment = Alignment.TopCenter
             ) {
                 Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // One-liner hook or milestone indicator
-                    Text(
-                        text = if (state.level.id % 10 == 0) "★ MILESTONE STAGE ★" else LevelTextEngine.getHookForLevel(state.level.id),
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.sp
-                        ),
-                        color = if (state.level.id % 10 == 0) Color(0xFFF59E0B) else activeTheme.textPrimaryColor.copy(alpha = 0.7f),
-                        textAlign = TextAlign.Center
-                    )
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    com.mitsara.arrowescape.ui.components.DifficultyMeter(level = state.level)
-
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    PuzzleBoardView(
-                        gridWidth = state.level.gridWidth,
-                        gridHeight = state.level.gridHeight,
-                        activeArrows = state.activeArrows,
-                        animatingArrowId = state.animatingArrowId,
-                        animatingDirection = state.animatingDirection,
-                        hintArrowId = state.hintArrowId,
-                        isMistakeShake = state.isMistakeShake,
-                        inspectedArrowId = state.inspectedArrowId,
-                        onArrowClick = { arrowId -> viewModel.onArrowTapped(arrowId) },
-                        theme = activeTheme,
-                        validCells = state.level.validCells,
-                        obstacles = state.level.obstacles
-                    )
-                }
-            }
-
-            // Modals
-            if (state.isCompleted) {
-                val stars = when {
-                    state.remainingLives >= 3 -> 3
-                    state.remainingLives == 2 -> 2
-                    else -> 1
-                }
-                LevelCompleteDialog(
-                    level = state.level,
-                    stars = stars,
-                    moveCount = state.moveCount,
-                    score = state.score,
-                    elapsedSeconds = state.elapsedSeconds,
-                    onNextLevel = {
-                        AdsManager.showInterstitial(context, userSettings.isPremium) {
-                            viewModel.nextLevel()
+                    // Minimal Floating Top Bar
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(activeTheme.surfaceBackgroundColor.copy(alpha = 0.85f), RoundedCornerShape(20.dp))
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = {
+                                showControlsOverlay = true
+                                onBackClick()
+                            },
+                            modifier = Modifier.testTag("back_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = activeTheme.textPrimaryColor
+                            )
                         }
-                    },
-                    onReplay = { viewModel.retryLevel() },
-                    onMainMenu = {
-                        AdsManager.showInterstitial(context, userSettings.isPremium) {
-                            onMainMenuClick()
+
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "LEVEL ${state.level.id}",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 2.sp),
+                                color = activeTheme.textPrimaryColor
+                            )
+                            Text(
+                                text = activeTheme.consoleStyleName,
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                                color = activeTheme.textPrimaryColor.copy(alpha = 0.7f)
+                            )
+                        }
+
+                        IconButton(
+                            onClick = {
+                                showControlsOverlay = true
+                                onSettingsClick()
+                            },
+                            modifier = Modifier.testTag("settings_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Settings,
+                                contentDescription = "Settings",
+                                tint = activeTheme.textPrimaryColor
+                            )
                         }
                     }
-                )
-            }
 
-            if (state.isFailed) {
-                LevelFailedDialog(
-                    levelNumber = state.level.id,
-                    onRetry = { viewModel.retryLevel() },
-                    onWatchAdForReward = {
-                        AdsManager.showRewardedAd(
-                            context = context,
-                            isPremium = userSettings.isPremium,
-                            onRewardGranted = { viewModel.addRewardHints(3) },
-                            onAdFailed = {}
-                        )
-                    },
-                    onMainMenu = onMainMenuClick
-                )
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    // Minimal Floating Bottom Action Bar
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(activeTheme.surfaceBackgroundColor.copy(alpha = 0.85f), RoundedCornerShape(24.dp))
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                showControlsOverlay = true
+                                viewModel.undoMove()
+                            },
+                            enabled = state.canUndo,
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier.height(44.dp)
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null, tint = activeTheme.textPrimaryColor, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Undo", color = activeTheme.textPrimaryColor, fontSize = 13.sp)
+                        }
+
+                        Button(
+                            onClick = {
+                                showControlsOverlay = true
+                                viewModel.requestHint()
+                            },
+                            shape = RoundedCornerShape(16.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = activeTheme.arrowHighlightColor),
+                            modifier = Modifier.height(44.dp)
+                        ) {
+                            Icon(Icons.Default.Lightbulb, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Hint (${state.hintsAvailable})", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                showControlsOverlay = true
+                                viewModel.retryLevel()
+                            },
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier.height(44.dp)
+                        ) {
+                            Text("Retry", color = activeTheme.textPrimaryColor, fontSize = 13.sp)
+                        }
+                    }
+                }
             }
+        }
+
+        // Modals
+        if (state.isCompleted) {
+            val stars = when {
+                state.remainingLives >= 3 -> 3
+                state.remainingLives == 2 -> 2
+                else -> 1
+            }
+            LevelCompleteDialog(
+                level = state.level,
+                stars = stars,
+                moveCount = state.moveCount,
+                score = state.score,
+                elapsedSeconds = state.elapsedSeconds,
+                onNextLevel = {
+                    AdsManager.showInterstitial(context, userSettings.isPremium) {
+                        viewModel.nextLevel()
+                    }
+                },
+                onReplay = { viewModel.retryLevel() },
+                onMainMenu = {
+                    AdsManager.showInterstitial(context, userSettings.isPremium) {
+                        onMainMenuClick()
+                    }
+                }
+            )
+        }
+
+        if (state.isFailed) {
+            LevelFailedDialog(
+                levelNumber = state.level.id,
+                onRetry = { viewModel.retryLevel() },
+                onWatchAdForReward = {
+                    AdsManager.showRewardedAd(
+                        context = context,
+                        isPremium = userSettings.isPremium,
+                        onRewardGranted = { viewModel.addRewardHints(3) },
+                        onAdFailed = {}
+                    )
+                },
+                onMainMenu = onMainMenuClick
+            )
         }
 
         // Combo Banner Overlay

@@ -54,6 +54,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import com.mitsara.arrowescape.data.UserSettingsEntity
 import com.mitsara.arrowescape.model.GameTheme
+import com.mitsara.arrowescape.model.ThemeManager
 import com.mitsara.arrowescape.monetization.ConsentManager
 import com.mitsara.arrowescape.monetization.ConsentStatus
 import com.mitsara.arrowescape.ui.components.AdBannerView
@@ -208,7 +209,7 @@ fun SettingsScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    GameTheme.entries.forEach { theme ->
+                    ThemeManager.allThemes.forEach { theme ->
                         val isSelected = userSettings.selectedTheme.equals(theme.id, ignoreCase = true)
                         val isLocked = theme.isPremiumOnly && !userSettings.isPremium
 
