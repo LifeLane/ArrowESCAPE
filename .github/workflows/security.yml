@@ -2,9 +2,10 @@ name: Arrow Escape Security & Dependency Scan
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, master, develop, 'release/**', 'feature/**', 'hotfix/**' ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main, master, develop ]
+  workflow_dispatch:
 
 permissions:
   contents: read
