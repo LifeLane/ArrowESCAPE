@@ -43,6 +43,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material3.IconButton
@@ -122,7 +124,7 @@ fun GameplayScreen(
             flowState = state.flowState
         )
 
-        // Full Screen Centered Game Board (Occupies entire screen behind transparent overlay)
+        // Full Screen Edge-to-Edge Game Board (Occupies entire screen viewport)
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -145,7 +147,7 @@ fun GameplayScreen(
                 theme = activeTheme,
                 validCells = state.level.validCells,
                 obstacles = state.level.obstacles,
-                modifier = Modifier.fillMaxWidth().padding(16.dp)
+                modifier = Modifier.fillMaxSize().padding(12.dp)
             )
         }
 
@@ -160,8 +162,8 @@ fun GameplayScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.systemBars)
-                    .background(Color.Black.copy(alpha = 0.2f))
-                    .padding(horizontal = 16.dp, vertical = 20.dp),
+                    .background(Color.Black.copy(alpha = 0.25f))
+                    .padding(horizontal = 16.dp, vertical = 16.dp),
                 contentAlignment = Alignment.TopCenter
             ) {
                 Column(
@@ -169,39 +171,59 @@ fun GameplayScreen(
                     verticalArrangement = Arrangement.SpaceBetween,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Minimal Floating Top Bar
+                    // Minimal Floating Top Bar with Back, Theme Toggle, Level Info & Settings
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(activeTheme.surfaceBackgroundColor.copy(alpha = 0.85f), RoundedCornerShape(20.dp))
+                            .background(activeTheme.surfaceBackgroundColor.copy(alpha = 0.9f), RoundedCornerShape(20.dp))
                             .padding(horizontal = 12.dp, vertical = 8.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        IconButton(
-                            onClick = {
-                                showControlsOverlay = true
-                                onBackClick()
-                            },
-                            modifier = Modifier.testTag("back_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back",
-                                tint = activeTheme.textPrimaryColor
-                            )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(
+                                onClick = {
+                                    showControlsOverlay = true
+                                    onBackClick()
+                                },
+                                modifier = Modifier.testTag("back_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Back",
+                                    tint = activeTheme.textPrimaryColor
+                                )
+                            }
+                            
+                            // Floating Theme Toggle Icon
+                            IconButton(
+                                onClick = {
+                                    showControlsOverlay = true
+                                    val allThemes = ThemeManager.allThemes
+                                    val currentIdx = allThemes.indexOfFirst { it.id == activeTheme.id }
+                                    val nextTheme = allThemes[(currentIdx + 1) % allThemes.size]
+                                    viewModel.selectTheme(nextTheme.id)
+                                },
+                                modifier = Modifier.testTag("theme_toggle_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Palette,
+                                    contentDescription = "Toggle Theme",
+                                    tint = activeTheme.arrowHighlightColor
+                                )
+                            }
                         }
 
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
                                 text = "LEVEL ${state.level.id}",
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 2.sp),
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp),
                                 color = activeTheme.textPrimaryColor
                             )
                             Text(
-                                text = activeTheme.consoleStyleName,
-                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
-                                color = activeTheme.textPrimaryColor.copy(alpha = 0.7f)
+                                text = "${state.activeArrows.size} ARROWS LEFT",
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold, fontSize = 10.sp),
+                                color = activeTheme.arrowHighlightColor
                             )
                         }
 
@@ -222,13 +244,13 @@ fun GameplayScreen(
 
                     Spacer(modifier = Modifier.weight(1f))
 
-                    // Minimal Floating Bottom Action Bar
+                    // Minimal Floating Bottom Action Bar with Undo, Lives, Hint, and Retry
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(activeTheme.surfaceBackgroundColor.copy(alpha = 0.85f), RoundedCornerShape(24.dp))
-                            .padding(horizontal = 16.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
+                            .background(activeTheme.surfaceBackgroundColor.copy(alpha = 0.9f), RoundedCornerShape(24.dp))
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         OutlinedButton(
@@ -240,9 +262,28 @@ fun GameplayScreen(
                             shape = RoundedCornerShape(16.dp),
                             modifier = Modifier.height(44.dp)
                         ) {
-                            Icon(Icons.Default.Refresh, contentDescription = null, tint = activeTheme.textPrimaryColor, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Undo", color = activeTheme.textPrimaryColor, fontSize = 13.sp)
+                            Icon(Icons.Default.Refresh, contentDescription = null, tint = activeTheme.textPrimaryColor, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Undo", color = activeTheme.textPrimaryColor, fontSize = 12.sp)
+                        }
+
+                        // Lives Counter Badge
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Favorite,
+                                contentDescription = "Lives",
+                                tint = Color(0xFFEF4444),
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "x${state.remainingLives}",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                color = activeTheme.textPrimaryColor
+                            )
                         }
 
                         Button(
@@ -254,9 +295,9 @@ fun GameplayScreen(
                             colors = ButtonDefaults.buttonColors(containerColor = activeTheme.arrowHighlightColor),
                             modifier = Modifier.height(44.dp)
                         ) {
-                            Icon(Icons.Default.Lightbulb, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Hint (${state.hintsAvailable})", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Icon(Icons.Default.Lightbulb, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Hint (${state.hintsAvailable})", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
 
                         OutlinedButton(
@@ -267,7 +308,7 @@ fun GameplayScreen(
                             shape = RoundedCornerShape(16.dp),
                             modifier = Modifier.height(44.dp)
                         ) {
-                            Text("Retry", color = activeTheme.textPrimaryColor, fontSize = 13.sp)
+                            Text("Retry", color = activeTheme.textPrimaryColor, fontSize = 12.sp)
                         }
                     }
                 }

@@ -54,16 +54,30 @@ object LevelGenerator {
 
         val obstacles = mutableSetOf<GridPoint>()
         val baseObstacleCount = when {
-            levelNumber <= 10 -> 1
-            levelNumber <= 25 -> 2
-            levelNumber <= 50 -> 3
-            levelNumber <= 100 -> 4
-            levelNumber <= 200 -> 6
-            levelNumber <= 350 -> 8
-            else -> 10
+            levelNumber <= 10 -> 2
+            levelNumber <= 25 -> 4
+            levelNumber <= 50 -> 6
+            levelNumber <= 100 -> 8
+            levelNumber <= 200 -> 10
+            levelNumber <= 350 -> 12
+            else -> 14
         }
-        val obstacleCount = baseObstacleCount + if (isMilestone) 4 else 0
-        val candidateObstacleCells = validCells.filter { it.x in 1 until gridSize - 1 && it.y in 1 until gridSize - 1 }.shuffled(random)
+        val obstacleCount = baseObstacleCount + if (isMilestone) 6 else 0
+        
+        // Generate geometric maze/barrier formations on higher levels
+        val center = gridSize / 2
+        if (levelNumber > 10) {
+            // Add central geometric barrier or cross/diamond walls
+            obstacles.add(GridPoint(center, center))
+            if (gridSize >= 7) {
+                obstacles.add(GridPoint(center - 1, center))
+                obstacles.add(GridPoint(center + 1, center))
+                obstacles.add(GridPoint(center, center - 1))
+                obstacles.add(GridPoint(center, center + 1))
+            }
+        }
+
+        val candidateObstacleCells = validCells.filter { it.x in 1 until gridSize - 1 && it.y in 1 until gridSize - 1 && !obstacles.contains(it) }.shuffled(random)
         for (cell in candidateObstacleCells) {
             if (obstacles.size < obstacleCount) {
                 obstacles.add(cell)

@@ -219,29 +219,40 @@ fun PuzzleBoardView(
                 }
             }
 
-            // Render obstacles
+            // Render obstacles as glowing geometric shapes
             for (obs in obstacles) {
                 val obsCenter = Offset(obs.x * cW + cW / 2, obs.y * cH + cH / 2)
-                val blockRadius = minOf(cW, cH) * 0.42f
-                drawRect(
-                    color = Color(0xFF334155),
-                    topLeft = Offset(obsCenter.x - blockRadius, obsCenter.y - blockRadius),
-                    size = androidx.compose.ui.geometry.Size(blockRadius * 2, blockRadius * 2)
+                val shapeRadius = minOf(cW, cH) * 0.38f
+                
+                // Outer neon glow
+                drawCircle(
+                    color = Color(0xFFFF5722).copy(alpha = 0.3f),
+                    radius = shapeRadius * 1.2f,
+                    center = obsCenter
                 )
-                // Inner X mark for obstacle barrier
-                drawLine(
-                    color = Color(0xFF64748B),
-                    start = Offset(obsCenter.x - blockRadius * 0.6f, obsCenter.y - blockRadius * 0.6f),
-                    end = Offset(obsCenter.x + blockRadius * 0.6f, obsCenter.y + blockRadius * 0.6f),
-                    strokeWidth = 3f,
-                    cap = StrokeCap.Round
+                
+                // Geometric Diamond / Crystal obstacle shape
+                val diamondPath = Path().apply {
+                    moveTo(obsCenter.x, obsCenter.y - shapeRadius)
+                    lineTo(obsCenter.x + shapeRadius, obsCenter.y)
+                    lineTo(obsCenter.x, obsCenter.y + shapeRadius)
+                    lineTo(obsCenter.x - shapeRadius, obsCenter.y)
+                    close()
+                }
+                drawPath(
+                    path = diamondPath,
+                    color = Color(0xFF1E293B)
                 )
-                drawLine(
-                    color = Color(0xFF64748B),
-                    start = Offset(obsCenter.x - blockRadius * 0.6f, obsCenter.y + blockRadius * 0.6f),
-                    end = Offset(obsCenter.x + blockRadius * 0.6f, obsCenter.y - blockRadius * 0.6f),
-                    strokeWidth = 3f,
-                    cap = StrokeCap.Round
+                drawPath(
+                    path = diamondPath,
+                    color = Color(0xFFFF5722),
+                    style = Stroke(width = 3f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                )
+                // Inner core dot
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.9f),
+                    radius = 4f,
+                    center = obsCenter
                 )
             }
 
@@ -253,11 +264,19 @@ fun PuzzleBoardView(
                 val isUnobstructed = PuzzleSolver.isArrowUnobstructed(arrow, activeArrows, gridWidth, gridHeight, obstacles)
 
                 val animProgressVal = if (isAnimatingThis) escapeProgress.value else 0f
-                val animTravel = animProgressVal * minOf(size.width, size.height) * 1.5f
                 val escapeDir = arrow.getTipDirection()
-                val offsetX = escapeDir.dx * animTravel
-                val offsetY = escapeDir.dy * animTravel
+                
+                // Sophisticated parabolic/curved vector fly-away trajectory
+                val boardSpan = minOf(size.width, size.height) * 2.2f
+                val arcDist = animProgressVal * boardSpan
+                val perpDx = -escapeDir.dy.toFloat()
+                val perpDy = escapeDir.dx.toFloat()
+                val curveOffset = kotlin.math.sin(animProgressVal * kotlin.math.PI.toFloat()) * perpDx * 50f
+                
+                val offsetX = escapeDir.dx * arcDist + curveOffset
+                val offsetY = escapeDir.dy * arcDist + kotlin.math.sin(animProgressVal * kotlin.math.PI.toFloat()) * perpDy * 50f
                 val animAlpha = if (isAnimatingThis) (1.0f - animProgressVal).coerceIn(0f, 1f) else 1.0f
+                val escapeScale = if (isAnimatingThis) 1.0f + animProgressVal * 0.4f - animProgressVal * animProgressVal * 0.6f else 1.0f
 
                 // Laser inspection ray when tapped while blocked
                 if (isInspectedThis) {
@@ -319,33 +338,28 @@ fun PuzzleBoardView(
                     }
                 }
 
-                // Jet-like spray / wake animation when escaping
+                // Lightweight glowing neon sparkle trail when escaping
                 if (isAnimatingThis) {
                     val tip = arrow.getTipCell()
                     val startCenter = Offset(tip.x * cW + cW / 2, tip.y * cH + cH / 2)
                     val currentCenter = Offset(startCenter.x + offsetX, startCenter.y + offsetY)
-                    val wakeLength = minOf(cW, cH) * 1.5f
-                    val wakeEnd = Offset(currentCenter.x - escapeDir.dx * wakeLength, currentCenter.y - escapeDir.dy * wakeLength)
-
-                    // Outer glowing jet spray
-                    drawLine(
-                        color = theme.arrowHighlightColor.copy(alpha = animAlpha * 0.7f),
-                        start = currentCenter,
-                        end = wakeEnd,
-                        strokeWidth = minOf(cW, cH) * 0.4f,
-                        cap = StrokeCap.Round
-                    )
-                    // Inner brilliant core spray
-                    drawLine(
-                        color = Color.White.copy(alpha = animAlpha),
-                        start = currentCenter,
-                        end = wakeEnd,
-                        strokeWidth = minOf(cW, cH) * 0.18f,
-                        cap = StrokeCap.Round
-                    )
+                    
+                    // Draw delicate fading particle spark dots along the wake
+                    for (i in 1..3) {
+                        val sparkOffset = i * 15f
+                        val sparkCenter = Offset(
+                            currentCenter.x - escapeDir.dx * sparkOffset,
+                            currentCenter.y - escapeDir.dy * sparkOffset
+                        )
+                        drawCircle(
+                            color = theme.arrowHighlightColor.copy(alpha = (animAlpha * (0.6f / i)).coerceIn(0f, 1f)),
+                            radius = (minOf(cW, cH) * 0.15f / i),
+                            center = sparkCenter
+                        )
+                    }
                 }
 
-                val arrowScale = if (arrow.id == pressedArrowId) pressScale.value else 1f
+                val arrowScale = (if (arrow.id == pressedArrowId) pressScale.value else 1.0f) * escapeScale
 
                 translate(left = offsetX, top = offsetY) {
                     drawArrowGraphics(
@@ -422,114 +436,99 @@ private fun DrawScope.drawArrowGraphics(
 
     scale(scale = scale, pivot = arrowCenter) {
         val arrowColor = getArrowColor(arrow, isHinted, theme)
-        val tileMargin = minOf(cellWidthPx, cellHeightPx) * 0.08f
+        val strokeWidth = minOf(cellWidthPx, cellHeightPx) * 0.22f
+        val headLength = minOf(cellWidthPx, cellHeightPx) * 0.45f
+        val headWidth = minOf(cellWidthPx, cellHeightPx) * 0.50f
 
-    // Draw rounded tile block background for each occupied cell of the arrow
-    for (pt in occupiedCells) {
-        val left = pt.x * cellWidthPx + tileMargin
-        val top = pt.y * cellHeightPx + tileMargin
-        val w = cellWidthPx - tileMargin * 2
-        val h = cellHeightPx - tileMargin * 2
+        // Build path connecting cell centers for single-line transparent neon arrow
+        val linePath = Path()
+        val firstPt = occupiedCells.first()
+        linePath.moveTo(firstPt.x * cellWidthPx + cellWidthPx / 2, firstPt.y * cellHeightPx + cellHeightPx / 2)
 
-        // Tile shadow / depth backing
-        drawRoundRect(
-            color = arrowColor.copy(alpha = alpha * 0.35f),
-            topLeft = Offset(left, top + 4f),
-            size = androidx.compose.ui.geometry.Size(w, h),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(18f, 18f)
-        )
-        // Tile main face
-        drawRoundRect(
-            color = arrowColor.copy(alpha = alpha),
-            topLeft = Offset(left, top),
-            size = androidx.compose.ui.geometry.Size(w, h),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(18f, 18f)
-        )
-        // Inner highlight edge
-        drawRoundRect(
-            color = Color.White.copy(alpha = alpha * 0.3f),
-            topLeft = Offset(left + 4f, top + 4f),
-            size = androidx.compose.ui.geometry.Size(w - 8f, h * 0.35f),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(12f, 12f)
-        )
-    }
-
-    val strokeWidth = minOf(cellWidthPx, cellHeightPx) * 0.22f
-    val headLength = minOf(cellWidthPx, cellHeightPx) * 0.40f
-    val headWidth = minOf(cellWidthPx, cellHeightPx) * 0.45f
-
-    // Build path connecting cell centers
-    val linePath = Path()
-    val firstPt = occupiedCells.first()
-    linePath.moveTo(firstPt.x * cellWidthPx + cellWidthPx / 2, firstPt.y * cellHeightPx + cellHeightPx / 2)
-
-    for (i in 1 until occupiedCells.size) {
-        val pt = occupiedCells[i]
-        linePath.lineTo(pt.x * cellWidthPx + cellWidthPx / 2, pt.y * cellHeightPx + cellHeightPx / 2)
-    }
-
-    // Draw connecting arrow shaft in crisp white/light contrast
-    drawPath(
-        path = linePath,
-        color = Color.White.copy(alpha = alpha * 0.95f),
-        style = Stroke(
-            width = strokeWidth,
-            cap = StrokeCap.Round,
-            join = StrokeJoin.Round
-        )
-    )
-
-    // Tip cell & Direction
-    val tipCell = arrow.getTipCell()
-    val tipCenter = Offset(
-        tipCell.x * cellWidthPx + cellWidthPx / 2,
-        tipCell.y * cellHeightPx + cellHeightPx / 2
-    )
-    val tipDirection = arrow.getTipDirection()
-
-    // Unobstructed "Ready to escape" subtle glow indicator
-    if (isUnobstructed && !isHinted) {
-        drawCircle(
-            color = Color(0xFF10B981).copy(alpha = 0.35f * alpha),
-            radius = minOf(cellWidthPx, cellHeightPx) * 0.38f,
-            center = tipCenter
-        )
-    }
-
-    // Draw solid Arrowhead at tip
-    rotate(degrees = tipDirection.rotationDegrees, pivot = tipCenter) {
-        val headPath = Path().apply {
-            moveTo(tipCenter.x, tipCenter.y - headLength * 0.65f) // Apex
-            lineTo(tipCenter.x - headWidth / 2, tipCenter.y + headLength * 0.35f)
-            lineTo(tipCenter.x, tipCenter.y + headLength * 0.1f)
-            lineTo(tipCenter.x + headWidth / 2, tipCenter.y + headLength * 0.35f)
-            close()
+        for (i in 1 until occupiedCells.size) {
+            val pt = occupiedCells[i]
+            linePath.lineTo(pt.x * cellWidthPx + cellWidthPx / 2, pt.y * cellHeightPx + cellHeightPx / 2)
         }
 
+        // Draw outer translucent neon glow aura along shaft
         drawPath(
-            path = headPath,
-            color = Color.White.copy(alpha = alpha)
+            path = linePath,
+            color = arrowColor.copy(alpha = alpha * 0.5f),
+            style = Stroke(
+                width = strokeWidth * 1.8f,
+                cap = StrokeCap.Round,
+                join = StrokeJoin.Round
+            )
         )
-    }
 
-    // Concentric Ripple Target on Hinted/Selected Arrow
-    if (isHinted) {
-        val baseRadius = minOf(cellWidthPx, cellHeightPx) * 0.30f
-        drawCircle(
-            color = theme.arrowHighlightColor.copy(alpha = 0.25f * alpha),
-            radius = baseRadius * hintScale,
-            center = tipCenter
+        // Draw crisp inner core line shaft
+        drawPath(
+            path = linePath,
+            color = arrowColor.copy(alpha = alpha * 0.9f),
+            style = Stroke(
+                width = strokeWidth,
+                cap = StrokeCap.Round,
+                join = StrokeJoin.Round
+            )
         )
-        drawCircle(
-            color = theme.arrowHighlightColor.copy(alpha = 0.40f * alpha),
-            radius = baseRadius * 0.65f * hintScale,
-            center = tipCenter
+
+        // Tip cell & Direction
+        val tipCell = arrow.getTipCell()
+        val tipCenter = Offset(
+            tipCell.x * cellWidthPx + cellWidthPx / 2,
+            tipCell.y * cellHeightPx + cellHeightPx / 2
         )
-        drawCircle(
-            color = Color.White.copy(alpha = 0.90f * alpha),
-            radius = baseRadius * 0.35f,
-            center = tipCenter
-        )
+        val tipDirection = arrow.getTipDirection()
+
+        // Unobstructed "Ready to escape" glowing pulse indicator
+        if (isUnobstructed && !isHinted) {
+            drawCircle(
+                color = theme.arrowHighlightColor.copy(alpha = 0.4f * alpha),
+                radius = minOf(cellWidthPx, cellHeightPx) * 0.42f,
+                center = tipCenter
+            )
+        }
+
+        // Draw translucent glowing Arrowhead at tip
+        rotate(degrees = tipDirection.rotationDegrees, pivot = tipCenter) {
+            val headPath = Path().apply {
+                moveTo(tipCenter.x, tipCenter.y - headLength * 0.7f) // Apex
+                lineTo(tipCenter.x - headWidth / 2, tipCenter.y + headLength * 0.35f)
+                lineTo(tipCenter.x, tipCenter.y + headLength * 0.15f)
+                lineTo(tipCenter.x + headWidth / 2, tipCenter.y + headLength * 0.35f)
+                close()
+            }
+
+            // Outer arrowhead glow
+            drawPath(
+                path = headPath,
+                color = arrowColor.copy(alpha = alpha * 0.6f)
+            )
+            // Inner bright arrowhead face
+            drawPath(
+                path = headPath,
+                color = Color.White.copy(alpha = alpha * 0.95f)
+            )
+        }
+
+        // Concentric Ripple Target on Hinted/Selected Arrow
+        if (isHinted) {
+            val baseRadius = minOf(cellWidthPx, cellHeightPx) * 0.32f
+            drawCircle(
+                color = theme.arrowHighlightColor.copy(alpha = 0.25f * alpha),
+                radius = baseRadius * hintScale,
+                center = tipCenter
+            )
+            drawCircle(
+                color = theme.arrowHighlightColor.copy(alpha = 0.45f * alpha),
+                radius = baseRadius * 0.65f * hintScale,
+                center = tipCenter
+            )
+            drawCircle(
+                color = Color.White.copy(alpha = 0.95f * alpha),
+                radius = baseRadius * 0.35f,
+                center = tipCenter
+            )
+        }
     }
-}
 }
