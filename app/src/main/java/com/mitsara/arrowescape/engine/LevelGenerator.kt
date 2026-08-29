@@ -208,12 +208,39 @@ object LevelGenerator {
                 val startX = random.nextInt(gridSize)
                 val startY = random.nextInt(gridSize)
 
+                val isBent = random.nextFloat() < 0.35f && multiCellProb > 0.2f && gridSize >= 6
+                val pathPoints = if (isBent) {
+                    val turnLen1 = random.nextInt(2, 4)
+                    val turnLen2 = random.nextInt(2, 4)
+                    val pts = mutableListOf<GridPoint>()
+                    var cx = startX
+                    var cy = startY
+                    pts.add(GridPoint(cx, cy))
+                    for (i in 1 until turnLen1) {
+                        cx += dir.dx
+                        cy += dir.dy
+                        pts.add(GridPoint(cx, cy))
+                    }
+                    val perpDir = if (dir == Direction.UP || dir == Direction.DOWN) {
+                        if (random.nextBoolean()) Direction.LEFT else Direction.RIGHT
+                    } else {
+                        if (random.nextBoolean()) Direction.UP else Direction.DOWN
+                    }
+                    for (i in 1 until turnLen2) {
+                        cx += perpDir.dx
+                        cy += perpDir.dy
+                        pts.add(GridPoint(cx, cy))
+                    }
+                    pts
+                } else null
+
                 val cand = Arrow(
                     id = currentId,
                     startX = startX,
                     startY = startY,
-                    length = length,
+                    length = pathPoints?.size ?: length,
                     direction = dir,
+                    pathPoints = pathPoints,
                     customColorHex = paletteHex[(currentId - 1) % paletteHex.size]
                 )
 

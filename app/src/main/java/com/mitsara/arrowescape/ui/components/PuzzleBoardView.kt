@@ -266,17 +266,14 @@ fun PuzzleBoardView(
                 val animProgressVal = if (isAnimatingThis) escapeProgress.value else 0f
                 val escapeDir = arrow.getTipDirection()
                 
-                // Sophisticated parabolic/curved vector fly-away trajectory
-                val boardSpan = minOf(size.width, size.height) * 2.2f
-                val arcDist = animProgressVal * boardSpan
-                val perpDx = -escapeDir.dy.toFloat()
-                val perpDy = escapeDir.dx.toFloat()
-                val curveOffset = kotlin.math.sin(animProgressVal * kotlin.math.PI.toFloat()) * perpDx * 50f
+                // Smooth snake-like sliding along grid axes without fading or side curving
+                val boardSpan = minOf(size.width, size.height) * 2.5f
+                val travelDist = animProgressVal * boardSpan
                 
-                val offsetX = escapeDir.dx * arcDist + curveOffset
-                val offsetY = escapeDir.dy * arcDist + kotlin.math.sin(animProgressVal * kotlin.math.PI.toFloat()) * perpDy * 50f
-                val animAlpha = if (isAnimatingThis) (1.0f - animProgressVal).coerceIn(0f, 1f) else 1.0f
-                val escapeScale = if (isAnimatingThis) 1.0f + animProgressVal * 0.4f - animProgressVal * animProgressVal * 0.6f else 1.0f
+                val offsetX = escapeDir.dx * travelDist
+                val offsetY = escapeDir.dy * travelDist
+                val animAlpha = 1.0f // Fully opaque as it slides off the board like a snake
+                val escapeScale = 1.0f
 
                 // Laser inspection ray when tapped while blocked
                 if (isInspectedThis) {
