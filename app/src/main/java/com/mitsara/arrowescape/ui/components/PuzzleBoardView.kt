@@ -436,11 +436,11 @@ private fun DrawScope.drawArrowGraphics(
 
     scale(scale = scale, pivot = arrowCenter) {
         val arrowColor = getArrowColor(arrow, isHinted, theme)
-        val strokeWidth = minOf(cellWidthPx, cellHeightPx) * 0.22f
-        val headLength = minOf(cellWidthPx, cellHeightPx) * 0.45f
-        val headWidth = minOf(cellWidthPx, cellHeightPx) * 0.50f
+        val strokeWidth = minOf(cellWidthPx, cellHeightPx) * 0.12f
+        val headLength = minOf(cellWidthPx, cellHeightPx) * 0.35f
+        val headWidth = minOf(cellWidthPx, cellHeightPx) * 0.40f
 
-        // Build path connecting cell centers for single-line transparent neon arrow
+        // Build path connecting cell centers for single-line transparent neon arrow with long tail
         val linePath = Path()
         val firstPt = occupiedCells.first()
         linePath.moveTo(firstPt.x * cellWidthPx + cellWidthPx / 2, firstPt.y * cellHeightPx + cellHeightPx / 2)
@@ -453,9 +453,20 @@ private fun DrawScope.drawArrowGraphics(
         // Draw outer translucent neon glow aura along shaft
         drawPath(
             path = linePath,
-            color = arrowColor.copy(alpha = alpha * 0.5f),
+            color = arrowColor.copy(alpha = alpha * 0.4f),
             style = Stroke(
-                width = strokeWidth * 1.8f,
+                width = strokeWidth * 2.2f,
+                cap = StrokeCap.Round,
+                join = StrokeJoin.Round
+            )
+        )
+
+        // Draw parallel neon laser lines along the tail for rich multi-line fiber aesthetic
+        drawPath(
+            path = linePath,
+            color = arrowColor.copy(alpha = alpha * 0.6f),
+            style = Stroke(
+                width = strokeWidth * 0.5f,
                 cap = StrokeCap.Round,
                 join = StrokeJoin.Round
             )
@@ -464,9 +475,9 @@ private fun DrawScope.drawArrowGraphics(
         // Draw crisp inner core line shaft
         drawPath(
             path = linePath,
-            color = arrowColor.copy(alpha = alpha * 0.9f),
+            color = Color.White.copy(alpha = alpha * 0.95f),
             style = Stroke(
-                width = strokeWidth,
+                width = strokeWidth * 0.8f,
                 cap = StrokeCap.Round,
                 join = StrokeJoin.Round
             )

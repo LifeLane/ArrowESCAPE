@@ -22,13 +22,13 @@ object LevelGenerator {
 
         val isMilestone = levelNumber % 10 == 0
         val baseConfig = when {
-            levelNumber <= 10 -> LevelConfig(6, 8 + levelNumber / 2, Difficulty.EASY, 0.1f, BoardShape.SQUARE)
-            levelNumber <= 25 -> LevelConfig(7, 12 + (levelNumber - 10) / 2, Difficulty.EASY, 0.15f, BoardShape.CROSS)
-            levelNumber <= 50 -> LevelConfig(8, 16 + (levelNumber - 25) / 3, Difficulty.NORMAL, 0.20f, BoardShape.DIAMOND)
-            levelNumber <= 100 -> LevelConfig(9, 22 + (levelNumber - 50) / 4, Difficulty.NORMAL, 0.25f, BoardShape.values()[random.nextInt(5)])
-            levelNumber <= 200 -> LevelConfig(10, 28 + (levelNumber - 100) / 5, Difficulty.HARD, 0.30f, BoardShape.values()[random.nextInt(5)])
-            levelNumber <= 350 -> LevelConfig(11, 35 + (levelNumber - 200) / 6, Difficulty.HARD, 0.35f, BoardShape.values()[random.nextInt(5)])
-            else -> LevelConfig(12, 42 + minOf((levelNumber - 350) / 8, 12), Difficulty.EXPERT, 0.40f, BoardShape.values()[random.nextInt(5)])
+            levelNumber <= 10 -> LevelConfig(6, 8 + levelNumber / 2, Difficulty.EASY, 0.3f, BoardShape.SQUARE)
+            levelNumber <= 25 -> LevelConfig(7, 12 + (levelNumber - 10) / 2, Difficulty.EASY, 0.4f, BoardShape.CROSS)
+            levelNumber <= 50 -> LevelConfig(8, 16 + (levelNumber - 25) / 3, Difficulty.NORMAL, 0.5f, BoardShape.DIAMOND)
+            levelNumber <= 100 -> LevelConfig(9, 22 + (levelNumber - 50) / 4, Difficulty.NORMAL, 0.6f, BoardShape.values()[random.nextInt(5)])
+            levelNumber <= 200 -> LevelConfig(10, 28 + (levelNumber - 100) / 5, Difficulty.HARD, 0.65f, BoardShape.values()[random.nextInt(5)])
+            levelNumber <= 350 -> LevelConfig(11, 35 + (levelNumber - 200) / 6, Difficulty.HARD, 0.7f, BoardShape.values()[random.nextInt(5)])
+            else -> LevelConfig(12, 42 + minOf((levelNumber - 350) / 8, 12), Difficulty.EXPERT, 0.75f, BoardShape.values()[random.nextInt(5)])
         }
 
         val milestoneShapes = listOf(BoardShape.CROSS, BoardShape.DIAMOND, BoardShape.DONUT, BoardShape.PLUS)
@@ -202,7 +202,9 @@ object LevelGenerator {
 
             for (tryCount in 0 until maxAttemptsPerArrow) {
                 val dir = directions[random.nextInt(directions.size)]
-                val length = if (random.nextFloat() < multiCellProb && gridSize >= 5) 2 else 1
+                val length = if (random.nextFloat() < multiCellProb && gridSize >= 5) {
+                    random.nextInt(2, minOf(gridSize - 1, 5))
+                } else 1
                 val startX = random.nextInt(gridSize)
                 val startY = random.nextInt(gridSize)
 
