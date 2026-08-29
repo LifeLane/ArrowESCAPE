@@ -319,6 +319,29 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun equipCosmetic(category: com.mitsara.arrowescape.model.CosmeticCategory, cosmeticId: String) {
+        viewModelScope.launch {
+            soundManager.playTapSound()
+            repository.equipCosmetic(category, cosmeticId)
+        }
+    }
+
+    fun unlockCosmetic(cosmeticId: String, cost: Int) {
+        viewModelScope.launch {
+            val success = repository.unlockCosmetic(cosmeticId, cost)
+            if (success) {
+                soundManager.playVictorySound()
+            }
+        }
+    }
+
+    fun equipPreset(preset: com.mitsara.arrowescape.model.CosmeticPreset) {
+        viewModelScope.launch {
+            soundManager.playVictorySound()
+            repository.equipPreset(preset)
+        }
+    }
+
     fun unlockSkin(skinId: String, cost: Int) {
         viewModelScope.launch {
             repository.unlockSkin(skinId, cost)

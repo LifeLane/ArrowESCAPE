@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -71,6 +72,10 @@ fun PuzzleBoardView(
     theme: GameTheme = ThemeManager.RETRO_ARCADE,
     validCells: Set<GridPoint>? = null,
     obstacles: Set<GridPoint> = emptySet(),
+    selectedArrowId: String = "ARROW_CYBER_NEON",
+    selectedBoardId: String = "BOARD_OBSIDIAN",
+    selectedGridId: String = "GRID_NEON_LATTICE",
+    selectedFrameId: String = "FRAME_CYBER_BRACKETS",
     modifier: Modifier = Modifier
 ) {
     // Shake animation offset
@@ -163,10 +168,10 @@ fun PuzzleBoardView(
             .fillMaxWidth()
             .aspectRatio(1f)
             .offset { IntOffset(shakeOffset.value.toInt(), 0) }
-            .shadow(8.dp, shape = RoundedCornerShape(24.dp))
+            .shadow(12.dp, shape = RoundedCornerShape(24.dp))
             .clip(RoundedCornerShape(24.dp))
             .background(theme.boardCanvasColor)
-            .padding(12.dp)
+            .padding(10.dp)
             .testTag("puzzle_board")
             .pointerInput(gridWidth, gridHeight, activeArrows) {
                 detectTapGestures { offset ->
@@ -200,31 +205,19 @@ fun PuzzleBoardView(
             val cW = size.width / gridWidth
             val cH = size.height / gridHeight
 
-            // Grid cell slots background
-            for (x in 0 until gridWidth) {
-                for (y in 0 until gridHeight) {
-                    val p = GridPoint(x, y)
-                    if (validCells == null || validCells.contains(p)) {
-                        val left = x * cW + 4f
-                        val top = y * cH + 4f
-                        val w = cW - 8f
-                        val h = cH - 8f
-                        drawRoundRect(
-                            color = theme.gridDotColor.copy(alpha = 0.25f),
-                            topLeft = Offset(left, top),
-                            size = androidx.compose.ui.geometry.Size(w, h),
-                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(16f, 16f)
-                        )
-                        val centerX = x * cW + cW / 2
-                        val centerY = y * cH + cH / 2
-                        drawCircle(
-                            color = theme.gridDotColor.copy(alpha = 0.6f),
-                            radius = 2.dp.toPx(),
-                            center = Offset(centerX, centerY)
-                        )
-                    }
-                }
-            }
+            // 1. Draw Cosmetic Board Surface
+            drawCosmeticBoardSurface(selectedBoardId, size, theme.boardCanvasColor)
+
+            // 2. Draw Cosmetic Grid Matrix Slots
+            drawCosmeticGridSlots(
+                gridId = selectedGridId,
+                gridWidth = gridWidth,
+                gridHeight = gridHeight,
+                cellW = cW,
+                cellH = cH,
+                validCells = validCells,
+                themeDotColor = theme.gridDotColor
+            )
 
             // Render obstacles as glowing geometric shapes
             for (obs in obstacles) {
@@ -279,7 +272,8 @@ fun PuzzleBoardView(
                         cellWidthPx = cW,
                         cellHeightPx = cH,
                         progress = escapeProgress.value,
-                        theme = theme
+                        theme = theme,
+                        selectedArrowId = selectedArrowId
                     )
                 } else {
                     // Laser inspection ray when tapped while blocked
@@ -354,7 +348,8 @@ fun PuzzleBoardView(
                         hintScale = hintPulseScale,
                         alpha = 1.0f,
                         scale = arrowScale,
-                        theme = theme
+                        theme = theme,
+                        selectedArrowId = selectedArrowId
                     )
                 }
             }
@@ -367,6 +362,9 @@ fun PuzzleBoardView(
                     center = Offset(p.x * cW + cW/2, p.y * cH + cH/2)
                 )
             }
+
+            // Draw Frame Border
+            drawCosmeticFrameBorder(selectedFrameId, size, theme.arrowHighlightColor)
         }
     }
 }
@@ -403,7 +401,8 @@ private fun DrawScope.drawEscapingArrow(
     cellWidthPx: Float,
     cellHeightPx: Float,
     progress: Float,
-    theme: GameTheme
+    theme: GameTheme,
+    selectedArrowId: String = "ARROW_CYBER_NEON"
 ) {
     val occupiedCells = arrow.getOccupiedCells()
     if (occupiedCells.isEmpty()) return
@@ -449,12 +448,24 @@ private fun DrawScope.drawEscapingArrow(
     if (bodyRestLength > 0.01f) {
         val bodyPath = path.buildBodyPath(uTail, uTip)
 
+        val glowColor = when (selectedArrowId) {
+            "ARROW_DRAGON_FLAME" -> Color(0xFFFF5722)
+            "ARROW_PLASMA_BOLT" -> Color(0xFFC084FC)
+            "ARROW_CRYSTAL_PRISM" -> Color(0xFF38BDF8)
+            "ARROW_STEAMPUNK_BRASS" -> Color(0xFFF59E0B)
+            "ARROW_HOLOGRAM_AURA" -> Color(0xFF10B981)
+            "ARROW_GOOGLY_RAINBOW" -> Color(0xFFFF007F)
+            "ARROW_GOLDEN_ROYAL" -> Color(0xFFFBBF24)
+            "ARROW_VOID_SINGULARITY" -> Color(0xFFA855F7)
+            else -> arrowColor
+        }
+
         // Outer translucent neon glow aura along shaft
         drawPath(
             path = bodyPath,
-            color = arrowColor.copy(alpha = 0.4f),
+            color = glowColor.copy(alpha = 0.45f),
             style = Stroke(
-                width = strokeWidth * 2.2f,
+                width = strokeWidth * 2.4f,
                 cap = StrokeCap.Round,
                 join = StrokeJoin.Round
             )
@@ -463,9 +474,9 @@ private fun DrawScope.drawEscapingArrow(
         // Parallel fiber laser lines
         drawPath(
             path = bodyPath,
-            color = arrowColor.copy(alpha = 0.6f),
+            color = arrowColor.copy(alpha = 0.65f),
             style = Stroke(
-                width = strokeWidth * 0.5f,
+                width = strokeWidth * 0.6f,
                 cap = StrokeCap.Round,
                 join = StrokeJoin.Round
             )
@@ -485,35 +496,172 @@ private fun DrawScope.drawEscapingArrow(
 
     // 4. Draw glowing Arrowhead at tip oriented with the path tangent angle
     rotate(degrees = tipAngleDeg, pivot = tipPos) {
-        val headPath = Path().apply {
-            moveTo(tipPos.x, tipPos.y - headLength * 0.7f) // Apex
-            lineTo(tipPos.x - headWidth / 2, tipPos.y + headLength * 0.35f)
-            lineTo(tipPos.x, tipPos.y + headLength * 0.15f)
-            lineTo(tipPos.x + headWidth / 2, tipPos.y + headLength * 0.35f)
-            close()
-        }
-
-        // Outer arrowhead glow
-        drawPath(
-            path = headPath,
-            color = arrowColor.copy(alpha = 0.6f)
-        )
-        // Inner bright arrowhead face
-        drawPath(
-            path = headPath,
-            color = Color.White.copy(alpha = 0.95f)
+        drawCosmeticArrowhead(
+            selectedArrowId = selectedArrowId,
+            tipPos = tipPos,
+            headLength = headLength,
+            headWidth = headWidth,
+            arrowColor = arrowColor,
+            alpha = 1.0f
         )
     }
 
     // 5. Draw delicate glowing particle spark dots trailing along the wake behind tip
-    for (i in 1..3) {
-        val sparkDist = i * (minOf(cellWidthPx, cellHeightPx) * 0.25f)
+    for (i in 1..4) {
+        val sparkDist = i * (minOf(cellWidthPx, cellHeightPx) * 0.22f)
         val sparkSample = path.sampleAt(max(0f, uTip - sparkDist))
+        val sparkColor = when (selectedArrowId) {
+            "ARROW_DRAGON_FLAME" -> Color(0xFFFF9100)
+            "ARROW_PLASMA_BOLT" -> Color(0xFFE879F9)
+            "ARROW_CRYSTAL_PRISM" -> Color(0xFFA5B4FC)
+            "ARROW_GOLDEN_ROYAL" -> Color(0xFFFDE047)
+            else -> theme.arrowHighlightColor
+        }
         drawCircle(
-            color = theme.arrowHighlightColor.copy(alpha = (0.6f / i).coerceIn(0f, 1f)),
-            radius = (minOf(cellWidthPx, cellHeightPx) * 0.14f / i),
+            color = sparkColor.copy(alpha = (0.7f / i).coerceIn(0f, 1f)),
+            radius = (minOf(cellWidthPx, cellHeightPx) * 0.16f / i),
             center = sparkSample.position
         )
+    }
+}
+
+fun DrawScope.drawCosmeticArrowhead(
+    selectedArrowId: String,
+    tipPos: Offset,
+    headLength: Float,
+    headWidth: Float,
+    arrowColor: Color,
+    alpha: Float
+) {
+    when (selectedArrowId) {
+        "ARROW_CRYSTAL_PRISM" -> {
+            // Faceted Crystal Diamond Head
+            val diamondPath = Path().apply {
+                moveTo(tipPos.x, tipPos.y - headLength * 0.85f)
+                lineTo(tipPos.x + headWidth * 0.55f, tipPos.y + headLength * 0.1f)
+                lineTo(tipPos.x, tipPos.y + headLength * 0.45f)
+                lineTo(tipPos.x - headWidth * 0.55f, tipPos.y + headLength * 0.1f)
+                close()
+            }
+            drawPath(path = diamondPath, color = Color(0xFF818CF8).copy(alpha = alpha * 0.4f))
+            drawPath(path = diamondPath, color = Color.White.copy(alpha = alpha * 0.95f), style = Stroke(width = 2.dp.toPx()))
+            drawLine(Color(0xFF38BDF8), Offset(tipPos.x, tipPos.y - headLength * 0.85f), Offset(tipPos.x, tipPos.y + headLength * 0.45f), 2.dp.toPx())
+        }
+        "ARROW_DRAGON_FLAME" -> {
+            // Dragon Flame Spearhead
+            val flamePath = Path().apply {
+                moveTo(tipPos.x, tipPos.y - headLength * 0.85f)
+                cubicTo(tipPos.x + headWidth * 0.6f, tipPos.y - headLength * 0.2f, tipPos.x + headWidth * 0.6f, tipPos.y + headLength * 0.2f, tipPos.x, tipPos.y + headLength * 0.4f)
+                cubicTo(tipPos.x - headWidth * 0.6f, tipPos.y + headLength * 0.2f, tipPos.x - headWidth * 0.6f, tipPos.y - headLength * 0.2f, tipPos.x, tipPos.y - headLength * 0.85f)
+                close()
+            }
+            drawPath(path = flamePath, color = Color(0xFFFF3D00).copy(alpha = alpha * 0.6f))
+            drawPath(path = flamePath, color = Color(0xFFFFD600).copy(alpha = alpha * 0.9f), style = Stroke(width = 2.dp.toPx()))
+        }
+        "ARROW_PLASMA_BOLT" -> {
+            // Jagged Plasma Bolt
+            val boltPath = Path().apply {
+                moveTo(tipPos.x, tipPos.y - headLength * 0.8f)
+                lineTo(tipPos.x + headWidth * 0.5f, tipPos.y)
+                lineTo(tipPos.x + headWidth * 0.15f, tipPos.y + headLength * 0.1f)
+                lineTo(tipPos.x + headWidth * 0.45f, tipPos.y + headLength * 0.4f)
+                lineTo(tipPos.x, tipPos.y + headLength * 0.2f)
+                lineTo(tipPos.x - headWidth * 0.45f, tipPos.y + headLength * 0.4f)
+                lineTo(tipPos.x - headWidth * 0.15f, tipPos.y + headLength * 0.1f)
+                lineTo(tipPos.x - headWidth * 0.5f, tipPos.y)
+                close()
+            }
+            drawPath(path = boltPath, color = Color(0xFFD946EF).copy(alpha = alpha * 0.7f))
+            drawPath(path = boltPath, color = Color.White.copy(alpha = alpha * 0.95f))
+        }
+        "ARROW_STEAMPUNK_BRASS" -> {
+            // Steampunk Gear-Notched Pointer
+            val gearPath = Path().apply {
+                moveTo(tipPos.x, tipPos.y - headLength * 0.75f)
+                lineTo(tipPos.x + headWidth * 0.45f, tipPos.y + headLength * 0.25f)
+                lineTo(tipPos.x + headWidth * 0.2f, tipPos.y + headLength * 0.25f)
+                lineTo(tipPos.x, tipPos.y + headLength * 0.1f)
+                lineTo(tipPos.x - headWidth * 0.2f, tipPos.y + headLength * 0.25f)
+                lineTo(tipPos.x - headWidth * 0.45f, tipPos.y + headLength * 0.25f)
+                close()
+            }
+            drawPath(path = gearPath, color = Color(0xFFD97706).copy(alpha = alpha * 0.8f))
+            drawPath(path = gearPath, color = Color(0xFFFEF3C7).copy(alpha = alpha * 0.95f), style = Stroke(width = 2.dp.toPx()))
+        }
+        "ARROW_RETRO_PIXEL" -> {
+            // 8-Bit Pixelated Arrow
+            drawRect(Color(0xFFFF0055), Offset(tipPos.x - 3.dp.toPx(), tipPos.y - headLength * 0.7f), Size(6.dp.toPx(), 6.dp.toPx()))
+            drawRect(Color(0xFFFFEE00), Offset(tipPos.x - 7.dp.toPx(), tipPos.y - headLength * 0.35f), Size(14.dp.toPx(), 6.dp.toPx()))
+            drawRect(Color(0xFF00FF99), Offset(tipPos.x - 11.dp.toPx(), tipPos.y), Size(22.dp.toPx(), 6.dp.toPx()))
+        }
+        "ARROW_HOLOGRAM_AURA" -> {
+            // Wireframe Hologram Arrow
+            val holoPath = Path().apply {
+                moveTo(tipPos.x, tipPos.y - headLength * 0.75f)
+                lineTo(tipPos.x - headWidth / 2, tipPos.y + headLength * 0.35f)
+                lineTo(tipPos.x, tipPos.y + headLength * 0.15f)
+                lineTo(tipPos.x + headWidth / 2, tipPos.y + headLength * 0.35f)
+                close()
+            }
+            drawPath(path = holoPath, color = Color(0xFF10B981).copy(alpha = alpha * 0.25f))
+            drawPath(path = holoPath, color = Color(0xFF00FF99).copy(alpha = alpha * 0.95f), style = Stroke(width = 2.5.dp.toPx()))
+        }
+        "ARROW_GOOGLY_RAINBOW" -> {
+            // Playful Rainbow Comet Head with Cute Eyes
+            val roundPath = Path().apply {
+                moveTo(tipPos.x, tipPos.y - headLength * 0.7f)
+                lineTo(tipPos.x - headWidth / 2, tipPos.y + headLength * 0.35f)
+                lineTo(tipPos.x, tipPos.y + headLength * 0.15f)
+                lineTo(tipPos.x + headWidth / 2, tipPos.y + headLength * 0.35f)
+                close()
+            }
+            drawPath(path = roundPath, color = Color(0xFFFF007F).copy(alpha = alpha * 0.9f))
+            // Googly cartoon eyes
+            drawCircle(Color.White, radius = 4.dp.toPx(), center = Offset(tipPos.x - 5.dp.toPx(), tipPos.y))
+            drawCircle(Color.Black, radius = 2.dp.toPx(), center = Offset(tipPos.x - 5.dp.toPx(), tipPos.y - 1.dp.toPx()))
+            drawCircle(Color.White, radius = 4.dp.toPx(), center = Offset(tipPos.x + 5.dp.toPx(), tipPos.y))
+            drawCircle(Color.Black, radius = 2.dp.toPx(), center = Offset(tipPos.x + 5.dp.toPx(), tipPos.y - 1.dp.toPx()))
+        }
+        "ARROW_GOLDEN_ROYAL" -> {
+            // 24K Royal Gilded Spearhead
+            val royalPath = Path().apply {
+                moveTo(tipPos.x, tipPos.y - headLength * 0.85f)
+                lineTo(tipPos.x + headWidth * 0.5f, tipPos.y + headLength * 0.25f)
+                lineTo(tipPos.x + headWidth * 0.25f, tipPos.y + headLength * 0.15f)
+                lineTo(tipPos.x, tipPos.y + headLength * 0.35f)
+                lineTo(tipPos.x - headWidth * 0.25f, tipPos.y + headLength * 0.15f)
+                lineTo(tipPos.x - headWidth * 0.5f, tipPos.y + headLength * 0.25f)
+                close()
+            }
+            drawPath(path = royalPath, color = Color(0xFFF59E0B).copy(alpha = alpha * 0.85f))
+            drawPath(path = royalPath, color = Color(0xFFFEF3C7).copy(alpha = alpha * 0.95f), style = Stroke(width = 2.5.dp.toPx()))
+            drawCircle(Color(0xFFDC2626), radius = 2.5.dp.toPx(), center = Offset(tipPos.x, tipPos.y - headLength * 0.2f))
+        }
+        "ARROW_VOID_SINGULARITY" -> {
+            // Dark matter void blade
+            val voidPath = Path().apply {
+                moveTo(tipPos.x, tipPos.y - headLength * 0.8f)
+                lineTo(tipPos.x - headWidth / 2, tipPos.y + headLength * 0.35f)
+                lineTo(tipPos.x, tipPos.y + headLength * 0.15f)
+                lineTo(tipPos.x + headWidth / 2, tipPos.y + headLength * 0.35f)
+                close()
+            }
+            drawCircle(Color(0xFFA855F7).copy(alpha = alpha * 0.45f), radius = headWidth * 0.7f, center = tipPos)
+            drawPath(path = voidPath, color = Color(0xFF0F172A).copy(alpha = alpha * 0.95f))
+            drawPath(path = voidPath, color = Color(0xFFA855F7).copy(alpha = alpha * 0.9f), style = Stroke(width = 2.dp.toPx()))
+        }
+        else -> {
+            // Default ARROW_CYBER_NEON
+            val headPath = Path().apply {
+                moveTo(tipPos.x, tipPos.y - headLength * 0.7f) // Apex
+                lineTo(tipPos.x - headWidth / 2, tipPos.y + headLength * 0.35f)
+                lineTo(tipPos.x, tipPos.y + headLength * 0.15f)
+                lineTo(tipPos.x + headWidth / 2, tipPos.y + headLength * 0.35f)
+                close()
+            }
+            drawPath(path = headPath, color = arrowColor.copy(alpha = alpha * 0.6f))
+            drawPath(path = headPath, color = Color.White.copy(alpha = alpha * 0.95f))
+        }
     }
 }
 
@@ -526,7 +674,8 @@ private fun DrawScope.drawArrowGraphics(
     hintScale: Float,
     alpha: Float,
     scale: Float = 1.0f,
-    theme: GameTheme
+    theme: GameTheme,
+    selectedArrowId: String = "ARROW_CYBER_NEON"
 ) {
     val occupiedCells = arrow.getOccupiedCells()
     if (occupiedCells.isEmpty()) return
@@ -544,7 +693,7 @@ private fun DrawScope.drawArrowGraphics(
         val headLength = minOf(cellWidthPx, cellHeightPx) * 0.35f
         val headWidth = minOf(cellWidthPx, cellHeightPx) * 0.40f
 
-        // Build path connecting cell centers for single-line transparent neon arrow with long tail
+        // Build path connecting cell centers
         val linePath = Path()
         val firstPt = occupiedCells.first()
         linePath.moveTo(firstPt.x * cellWidthPx + cellWidthPx / 2, firstPt.y * cellHeightPx + cellHeightPx / 2)
@@ -554,23 +703,35 @@ private fun DrawScope.drawArrowGraphics(
             linePath.lineTo(pt.x * cellWidthPx + cellWidthPx / 2, pt.y * cellHeightPx + cellHeightPx / 2)
         }
 
+        val glowColor = when (selectedArrowId) {
+            "ARROW_DRAGON_FLAME" -> Color(0xFFFF5722)
+            "ARROW_PLASMA_BOLT" -> Color(0xFFC084FC)
+            "ARROW_CRYSTAL_PRISM" -> Color(0xFF38BDF8)
+            "ARROW_STEAMPUNK_BRASS" -> Color(0xFFF59E0B)
+            "ARROW_HOLOGRAM_AURA" -> Color(0xFF10B981)
+            "ARROW_GOOGLY_RAINBOW" -> Color(0xFFFF007F)
+            "ARROW_GOLDEN_ROYAL" -> Color(0xFFFBBF24)
+            "ARROW_VOID_SINGULARITY" -> Color(0xFFA855F7)
+            else -> arrowColor
+        }
+
         // Draw outer translucent neon glow aura along shaft
         drawPath(
             path = linePath,
-            color = arrowColor.copy(alpha = alpha * 0.4f),
+            color = glowColor.copy(alpha = alpha * 0.45f),
             style = Stroke(
-                width = strokeWidth * 2.2f,
+                width = strokeWidth * 2.4f,
                 cap = StrokeCap.Round,
                 join = StrokeJoin.Round
             )
         )
 
-        // Draw parallel neon laser lines along the tail for rich multi-line fiber aesthetic
+        // Draw parallel fiber lines
         drawPath(
             path = linePath,
-            color = arrowColor.copy(alpha = alpha * 0.6f),
+            color = arrowColor.copy(alpha = alpha * 0.65f),
             style = Stroke(
-                width = strokeWidth * 0.5f,
+                width = strokeWidth * 0.6f,
                 cap = StrokeCap.Round,
                 join = StrokeJoin.Round
             )
@@ -606,23 +767,13 @@ private fun DrawScope.drawArrowGraphics(
 
         // Draw translucent glowing Arrowhead at tip
         rotate(degrees = tipDirection.rotationDegrees, pivot = tipCenter) {
-            val headPath = Path().apply {
-                moveTo(tipCenter.x, tipCenter.y - headLength * 0.7f) // Apex
-                lineTo(tipCenter.x - headWidth / 2, tipCenter.y + headLength * 0.35f)
-                lineTo(tipCenter.x, tipCenter.y + headLength * 0.15f)
-                lineTo(tipCenter.x + headWidth / 2, tipCenter.y + headLength * 0.35f)
-                close()
-            }
-
-            // Outer arrowhead glow
-            drawPath(
-                path = headPath,
-                color = arrowColor.copy(alpha = alpha * 0.6f)
-            )
-            // Inner bright arrowhead face
-            drawPath(
-                path = headPath,
-                color = Color.White.copy(alpha = alpha * 0.95f)
+            drawCosmeticArrowhead(
+                selectedArrowId = selectedArrowId,
+                tipPos = tipCenter,
+                headLength = headLength,
+                headWidth = headWidth,
+                arrowColor = arrowColor,
+                alpha = alpha
             )
         }
 

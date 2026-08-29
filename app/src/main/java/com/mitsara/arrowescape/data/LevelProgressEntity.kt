@@ -26,7 +26,13 @@ data class UserSettingsEntity(
     val totalStars: Int = 0,
     val dailyStreak: Int = 1,
     val lastDailyCompletedDate: String = "",
-    val selectedTheme: String = "LIGHT",
+    val selectedTheme: String = "RETRO_ARCADE",
     val unlockedSkins: String = "CLASSIC",
-    val selectedSkin: String = "CLASSIC"
+    val selectedSkin: String = "CLASSIC",
+    val selectedArrow: String = "ARROW_CYBER_NEON",
+    val selectedBackground: String = "BG_DEEP_COSMOS",
+    val selectedBoard: String = "BOARD_OBSIDIAN",
+    val selectedGrid: String = "GRID_NEON_LATTICE",
+    val selectedFrame: String = "FRAME_CYBER_BRACKETS",
+    val unlockedCosmetics: String = "ARROW_CYBER_NEON,BG_DEEP_COSMOS,BOARD_OBSIDIAN,GRID_NEON_LATTICE,FRAME_CYBER_BRACKETS"
 )

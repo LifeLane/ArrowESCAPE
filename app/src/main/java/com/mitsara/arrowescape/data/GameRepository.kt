@@ -93,6 +93,66 @@ class GameRepository(private val dao: GameDao) {
         }
     }
 
+    suspend fun equipCosmetic(category: com.mitsara.arrowescape.model.CosmeticCategory, cosmeticId: String) {
+        val current = dao.getUserSettingsDirect() ?: UserSettingsEntity()
+        val updated = when (category) {
+            com.mitsara.arrowescape.model.CosmeticCategory.ARROW -> current.copy(selectedArrow = cosmeticId)
+            com.mitsara.arrowescape.model.CosmeticCategory.BACKGROUND -> current.copy(selectedBackground = cosmeticId)
+            com.mitsara.arrowescape.model.CosmeticCategory.BOARD -> current.copy(selectedBoard = cosmeticId)
+            com.mitsara.arrowescape.model.CosmeticCategory.GRID -> current.copy(selectedGrid = cosmeticId)
+            com.mitsara.arrowescape.model.CosmeticCategory.FRAME -> current.copy(selectedFrame = cosmeticId)
+            com.mitsara.arrowescape.model.CosmeticCategory.PRESET -> current
+        }
+        dao.saveUserSettings(updated)
+    }
+
+    suspend fun unlockCosmetic(cosmeticId: String, cost: Int): Boolean {
+        val current = dao.getUserSettingsDirect() ?: UserSettingsEntity()
+        val unlockedList = current.unlockedCosmetics.split(",").toMutableSet()
+        if (unlockedList.contains(cosmeticId)) return true
+        if (cost == 0 || current.totalStars >= cost || current.isPremium) {
+            unlockedList.add(cosmeticId)
+            val newStars = if (current.isPremium || cost == 0) current.totalStars else maxOf(0, current.totalStars - cost)
+            val cosmetic = com.mitsara.arrowescape.model.CosmeticsCatalog.getCosmetic(cosmeticId)
+            var updated = current.copy(
+                totalStars = newStars,
+                unlockedCosmetics = unlockedList.joinToString(",")
+            )
+            if (cosmetic != null) {
+                updated = when (cosmetic.category) {
+                    com.mitsara.arrowescape.model.CosmeticCategory.ARROW -> updated.copy(selectedArrow = cosmeticId)
+                    com.mitsara.arrowescape.model.CosmeticCategory.BACKGROUND -> updated.copy(selectedBackground = cosmeticId)
+                    com.mitsara.arrowescape.model.CosmeticCategory.BOARD -> updated.copy(selectedBoard = cosmeticId)
+                    com.mitsara.arrowescape.model.CosmeticCategory.GRID -> updated.copy(selectedGrid = cosmeticId)
+                    com.mitsara.arrowescape.model.CosmeticCategory.FRAME -> updated.copy(selectedFrame = cosmeticId)
+                    com.mitsara.arrowescape.model.CosmeticCategory.PRESET -> updated
+                }
+            }
+            dao.saveUserSettings(updated)
+            return true
+        }
+        return false
+    }
+
+    suspend fun equipPreset(preset: com.mitsara.arrowescape.model.CosmeticPreset) {
+        val current = dao.getUserSettingsDirect() ?: UserSettingsEntity()
+        val unlockedList = current.unlockedCosmetics.split(",").toMutableSet()
+        unlockedList.add(preset.arrowId)
+        unlockedList.add(preset.backgroundId)
+        unlockedList.add(preset.boardId)
+        unlockedList.add(preset.gridId)
+        unlockedList.add(preset.frameId)
+        val updated = current.copy(
+            selectedArrow = preset.arrowId,
+            selectedBackground = preset.backgroundId,
+            selectedBoard = preset.boardId,
+            selectedGrid = preset.gridId,
+            selectedFrame = preset.frameId,
+            unlockedCosmetics = unlockedList.joinToString(",")
+        )
+        dao.saveUserSettings(updated)
+    }
+
     suspend fun checkDailyStreak() {
         val current = dao.getUserSettingsDirect() ?: UserSettingsEntity()
         val dateFormat = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)

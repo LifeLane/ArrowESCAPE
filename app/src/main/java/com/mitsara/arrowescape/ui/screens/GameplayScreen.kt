@@ -106,10 +106,9 @@ fun GameplayScreen(
             .windowInsetsPadding(WindowInsets.systemBars)
             .background(activeTheme.boardCanvasColor)
     ) {
-        // Procedural Immersive Background Engine
-        com.mitsara.arrowescape.engine.graphics.BackgroundEngine(
-            theme = activeTheme,
-            flowState = state.flowState
+        // Procedural Cosmetic Animated Background Canvas
+        com.mitsara.arrowescape.ui.components.CosmeticBackgroundCanvas(
+            backgroundId = userSettings.selectedBackground
         )
 
         Column(
@@ -199,6 +198,10 @@ fun GameplayScreen(
                     theme = activeTheme,
                     validCells = state.level.validCells,
                     obstacles = state.level.obstacles,
+                    selectedArrowId = userSettings.selectedArrow,
+                    selectedBoardId = userSettings.selectedBoard,
+                    selectedGridId = userSettings.selectedGrid,
+                    selectedFrameId = userSettings.selectedFrame,
                     modifier = Modifier.fillMaxSize()
                 )
             }
