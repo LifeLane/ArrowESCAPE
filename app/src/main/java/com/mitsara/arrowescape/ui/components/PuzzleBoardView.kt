@@ -756,15 +756,6 @@ private fun DrawScope.drawArrowGraphics(
         )
         val tipDirection = arrow.getTipDirection()
 
-        // Unobstructed "Ready to escape" glowing pulse indicator
-        if (isUnobstructed && !isHinted) {
-            drawCircle(
-                color = theme.arrowHighlightColor.copy(alpha = 0.4f * alpha),
-                radius = minOf(cellWidthPx, cellHeightPx) * 0.42f,
-                center = tipCenter
-            )
-        }
-
         // Draw translucent glowing Arrowhead at tip
         rotate(degrees = tipDirection.rotationDegrees, pivot = tipCenter) {
             drawCosmeticArrowhead(

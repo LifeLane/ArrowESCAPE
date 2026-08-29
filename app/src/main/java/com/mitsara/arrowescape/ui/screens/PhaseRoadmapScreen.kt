@@ -4,19 +4,22 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
@@ -32,17 +35,16 @@ import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mitsara.arrowescape.data.LevelProgressEntity
 import com.mitsara.arrowescape.ui.components.AdBannerView
-import com.mitsara.arrowescape.ui.motion.AppThemeTokens
 import com.mitsara.arrowescape.ui.motion.StageEnvironmentCanvas
 import com.mitsara.arrowescape.ui.motion.StageProfiles
 import com.mitsara.arrowescape.ui.motion.StageVisualProfile
 import com.mitsara.arrowescape.ui.theme.GoldStar
-import kotlin.math.PI
-import kotlin.math.sin
 
 data class GamePhase(
     val phaseNumber: Int,
@@ -81,20 +83,33 @@ fun PhaseRoadmapScreen(
 ) {
     val isGooglyMode = selectedTheme.equals("GOOGLY", ignoreCase = true)
     var selectedPhaseIndex by remember { mutableIntStateOf(((currentLevelId - 1) / 50).coerceIn(0, 9)) }
+    var isPhaseDetailOpened by remember { mutableStateOf(false) }
+
     val currentPhase = GamePhases.getOrElse(selectedPhaseIndex) { GamePhases[0] }
     val profile = StageProfiles.getProfile(currentPhase.phaseNumber)
+
+    // Calculate total stars collected across all levels
+    val totalStars = remember(levelProgressMap) {
+        levelProgressMap.values.sumOf { it.stars }
+    }
+
+    // Determine the overall next playable level across the game
+    val activePlayableLevel = remember(currentLevelId, completedLevels) {
+        val maxUnlocked = maxOf(currentLevelId, (completedLevels.maxOrNull() ?: 1))
+        maxUnlocked
+    }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF070913))
     ) {
-        // 1. Stage Environmental Procedural Canvas (Smooth Crossfade on stage change)
+        // Dynamic Stage Environment Canvas in the background
         AnimatedContent(
             targetState = currentPhase.phaseNumber,
             transitionSpec = {
-                fadeIn(animationSpec = tween(500, easing = LinearEasing)) togetherWith
-                        fadeOut(animationSpec = tween(500, easing = LinearEasing))
+                fadeIn(animationSpec = tween(400, easing = LinearEasing)) togetherWith
+                        fadeOut(animationSpec = tween(400, easing = LinearEasing))
             },
             label = "StageCanvasTransition"
         ) { stageNum ->
@@ -105,7 +120,6 @@ fun PhaseRoadmapScreen(
             )
         }
 
-        // 2. Foreground Roadmap Navigation & Level Grid
         Scaffold(
             topBar = {
                 TopAppBar(
@@ -113,7 +127,7 @@ fun PhaseRoadmapScreen(
                         Column {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    text = "LEVEL ROADMAP",
+                                    text = if (isPhaseDetailOpened) "PHASE ${currentPhase.phaseNumber}" else "LEVEL ROADMAP",
                                     style = MaterialTheme.typography.titleMedium.copy(
                                         fontWeight = FontWeight.Black,
                                         letterSpacing = 1.sp
@@ -126,7 +140,7 @@ fun PhaseRoadmapScreen(
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
                                     Text(
-                                        text = "500 LEVELS",
+                                        text = if (isPhaseDetailOpened) "LVL ${currentPhase.startLevel}-${currentPhase.endLevel}" else "10 PHASES",
                                         style = MaterialTheme.typography.labelSmall.copy(
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 9.sp
@@ -137,14 +151,22 @@ fun PhaseRoadmapScreen(
                                 }
                             }
                             Text(
-                                text = "Stage ${currentPhase.phaseNumber} • ${currentPhase.title}",
+                                text = currentPhase.title,
                                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                                 color = profile.accentGlow
                             )
                         }
                     },
                     navigationIcon = {
-                        IconButton(onClick = onBackClick) {
+                        IconButton(
+                            onClick = {
+                                if (isPhaseDetailOpened) {
+                                    isPhaseDetailOpened = false
+                                } else {
+                                    onBackClick()
+                                }
+                            }
+                        ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "Back",
@@ -152,300 +174,614 @@ fun PhaseRoadmapScreen(
                             )
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF070913).copy(alpha = 0.85f))
-                )
-            },
-            containerColor = Color.Transparent
-        ) { padding ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-            ) {
-                // ==========================================
-                // 3. HORIZONTAL STAGE SELECTOR TABS (Connected to Stage Identities)
-                // ==========================================
-                val scrollState = rememberScrollState()
-                LaunchedEffect(selectedPhaseIndex) {
-                    scrollState.animateScrollTo((selectedPhaseIndex * 110).dp.value.toInt())
-                }
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0xFF0E1322).copy(alpha = 0.9f))
-                        .horizontalScroll(scrollState)
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    GamePhases.forEachIndexed { index, phase ->
-                        val isSelected = selectedPhaseIndex == index
-                        val pProfile = StageProfiles.getProfile(phase.phaseNumber)
-
-                        val tabBg = if (isSelected) {
-                            if (isGooglyMode) {
-                                Brush.horizontalGradient(listOf(Color(0xFFFF007F), Color(0xFF00E5FF)))
-                            } else {
-                                Brush.horizontalGradient(listOf(pProfile.primaryColor, pProfile.secondaryColor))
+                    actions = {
+                        if (isPhaseDetailOpened) {
+                            IconButton(onClick = { isPhaseDetailOpened = false }) {
+                                Icon(
+                                    imageVector = Icons.Default.GridView,
+                                    contentDescription = "View Phase Grid",
+                                    tint = profile.accentGlow
+                                )
                             }
-                        } else {
-                            Brush.linearGradient(listOf(Color(0xFF1E293B).copy(alpha = 0.6f), Color(0xFF1E293B).copy(alpha = 0.6f)))
                         }
 
                         Surface(
                             shape = RoundedCornerShape(16.dp),
-                            color = Color.Transparent,
-                            border = androidx.compose.foundation.BorderStroke(
-                                1.dp,
-                                if (isSelected) pProfile.accentGlow else Color(0xFF334155).copy(alpha = 0.6f)
-                            ),
-                            shadowElevation = if (isSelected) 8.dp else 0.dp,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(tabBg)
-                                .clickable { selectedPhaseIndex = index }
+                            color = Color(0xFF1E293B).copy(alpha = 0.9f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, GoldStar.copy(alpha = 0.6f)),
+                            modifier = Modifier.padding(end = 12.dp)
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Star,
+                                    contentDescription = "Stars",
+                                    tint = GoldStar,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = "$totalStars",
+                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black),
+                                    color = Color.White,
+                                    fontSize = 13.sp
+                                )
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF070913).copy(alpha = 0.85f))
+                )
+            },
+            bottomBar = {
+                // =========================================================================
+                // BOTTOM BAR:
+                // 1. In Matrix Mode -> Active Level CTA (e.g. "PLAY LEVEL X")
+                // 2. In Phase Detail Mode -> Next / Back Buttons + Slider to slide phases!
+                // =========================================================================
+                Surface(
+                    shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+                    color = Color(0xFF0B101D).copy(alpha = 0.95f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1E293B)),
+                    shadowElevation = 16.dp,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (!isPhaseDetailOpened) {
+                        // Matrix Mode: Active Level CTA at the bottom
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Button(
+                                onClick = { onLevelSelected(activePlayableLevel) },
+                                shape = RoundedCornerShape(16.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFF00E5FF)
+                                ),
+                                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp)
+                                    .testTag("active_level_cta")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PlayArrow,
+                                    contentDescription = null,
+                                    tint = Color.Black,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = "CONTINUE: LEVEL $activePlayableLevel",
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 14.sp,
+                                    letterSpacing = 1.sp,
+                                    color = Color.Black
+                                )
+                            }
+                        }
+                    } else {
+                        // Opened Phase Mode: Back & Next buttons with Slider between them!
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            // Phase Slider Indicator Label
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "PHASE ${currentPhase.phaseNumber} / 10",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = profile.accentGlow
+                                )
+                                Text(
+                                    text = currentPhase.title,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFCBD5E1)
+                                )
+                            }
+
+                            Spacer(Modifier.height(4.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Box(
+                                // BACK BUTTON (Previous Phase)
+                                IconButton(
+                                    onClick = {
+                                        if (selectedPhaseIndex > 0) {
+                                            selectedPhaseIndex--
+                                        }
+                                    },
+                                    enabled = selectedPhaseIndex > 0,
                                     modifier = Modifier
-                                        .size(24.dp)
+                                        .size(36.dp)
+                                        .clip(CircleShape)
                                         .background(
-                                            if (isSelected) Color.White.copy(alpha = 0.25f) else pProfile.primaryColor.copy(alpha = 0.2f),
-                                            CircleShape
-                                        ),
-                                    contentAlignment = Alignment.Center
+                                            if (selectedPhaseIndex > 0) Color(0xFF1E293B) else Color(0xFF0F172A)
+                                        )
                                 ) {
-                                    Text(
-                                        text = "${phase.phaseNumber}",
-                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Black, fontSize = 11.sp),
-                                        color = if (isSelected) Color.White else pProfile.accentGlow
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                        contentDescription = "Previous Phase",
+                                        tint = if (selectedPhaseIndex > 0) Color.White else Color(0xFF475569),
+                                        modifier = Modifier.size(18.dp)
                                     )
                                 }
 
-                                Column {
-                                    Text(
-                                        text = phase.title,
-                                        style = MaterialTheme.typography.bodyMedium.copy(
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 12.sp
-                                        ),
-                                        color = if (isSelected) Color.White else Color(0xFFE2E8F0)
-                                    )
-                                    Text(
-                                        text = "Lvl ${phase.startLevel}-${phase.endLevel}",
-                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
-                                        color = if (isSelected) Color.White.copy(alpha = 0.85f) else Color(0xFF94A3B8)
+                                // SLIDER TO SLIDE BETWEEN PHASES
+                                Slider(
+                                    value = selectedPhaseIndex.toFloat(),
+                                    onValueChange = { newVal ->
+                                        selectedPhaseIndex = newVal.toInt().coerceIn(0, 9)
+                                    },
+                                    valueRange = 0f..9f,
+                                    steps = 8,
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = profile.accentGlow,
+                                        activeTrackColor = profile.primaryColor,
+                                        inactiveTrackColor = Color(0xFF1E293B),
+                                        activeTickColor = Color.Transparent,
+                                        inactiveTickColor = Color.Transparent
+                                    ),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("phase_slider")
+                                )
+
+                                // NEXT BUTTON (Next Phase)
+                                IconButton(
+                                    onClick = {
+                                        if (selectedPhaseIndex < 9) {
+                                            selectedPhaseIndex++
+                                        }
+                                    },
+                                    enabled = selectedPhaseIndex < 9,
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (selectedPhaseIndex < 9) Color(0xFF1E293B) else Color(0xFF0F172A)
+                                        )
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                        contentDescription = "Next Phase",
+                                        tint = if (selectedPhaseIndex < 9) Color.White else Color(0xFF475569),
+                                        modifier = Modifier.size(18.dp)
                                     )
                                 }
                             }
                         }
                     }
                 }
+            },
+            containerColor = Color.Transparent
+        ) { padding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+            ) {
+                if (!isPhaseDetailOpened) {
+                    // =========================================================================
+                    // 1. ALL 10 PHASES STACKED ON SCREEN IN A 2×3×3×2 COMPACT MATRIX
+                    // =========================================================================
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        // ROW 1: 2 Phases (Phase 1, Phase 2)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            PhaseGridCard(
+                                phase = GamePhases[0],
+                                currentLevelId = currentLevelId,
+                                completedLevels = completedLevels,
+                                isPremium = isPremium,
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    selectedPhaseIndex = 0
+                                    isPhaseDetailOpened = true
+                                }
+                            )
+                            PhaseGridCard(
+                                phase = GamePhases[1],
+                                currentLevelId = currentLevelId,
+                                completedLevels = completedLevels,
+                                isPremium = isPremium,
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    selectedPhaseIndex = 1
+                                    isPhaseDetailOpened = true
+                                }
+                            )
+                        }
 
-                // ==========================================
-                // 4. WINDING ROADMAP LEVEL NODES (50 Levels per stage)
-                // ==========================================
-                LazyColumn(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 14.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    // Stage Hero Banner Card
-                    item {
-                        StageHeroBannerCard(
-                            phase = currentPhase,
-                            profile = profile,
-                            isGooglyMode = isGooglyMode
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(Modifier.height(6.dp))
+
+                        // ROW 2: 3 Phases (Phase 3, Phase 4, Phase 5)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            PhaseGridCard(
+                                phase = GamePhases[2],
+                                currentLevelId = currentLevelId,
+                                completedLevels = completedLevels,
+                                isPremium = isPremium,
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    selectedPhaseIndex = 2
+                                    isPhaseDetailOpened = true
+                                }
+                            )
+                            PhaseGridCard(
+                                phase = GamePhases[3],
+                                currentLevelId = currentLevelId,
+                                completedLevels = completedLevels,
+                                isPremium = isPremium,
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    selectedPhaseIndex = 3
+                                    isPhaseDetailOpened = true
+                                }
+                            )
+                            PhaseGridCard(
+                                phase = GamePhases[4],
+                                currentLevelId = currentLevelId,
+                                completedLevels = completedLevels,
+                                isPremium = isPremium,
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    selectedPhaseIndex = 4
+                                    isPhaseDetailOpened = true
+                                }
+                            )
+                        }
+
+                        Spacer(Modifier.height(6.dp))
+
+                        // ROW 3: 3 Phases (Phase 6, Phase 7, Phase 8)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            PhaseGridCard(
+                                phase = GamePhases[5],
+                                currentLevelId = currentLevelId,
+                                completedLevels = completedLevels,
+                                isPremium = isPremium,
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    selectedPhaseIndex = 5
+                                    isPhaseDetailOpened = true
+                                }
+                            )
+                            PhaseGridCard(
+                                phase = GamePhases[6],
+                                currentLevelId = currentLevelId,
+                                completedLevels = completedLevels,
+                                isPremium = isPremium,
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    selectedPhaseIndex = 6
+                                    isPhaseDetailOpened = true
+                                }
+                            )
+                            PhaseGridCard(
+                                phase = GamePhases[7],
+                                currentLevelId = currentLevelId,
+                                completedLevels = completedLevels,
+                                isPremium = isPremium,
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    selectedPhaseIndex = 7
+                                    isPhaseDetailOpened = true
+                                }
+                            )
+                        }
+
+                        Spacer(Modifier.height(6.dp))
+
+                        // ROW 4: 2 Phases (Phase 9, Phase 10)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            PhaseGridCard(
+                                phase = GamePhases[8],
+                                currentLevelId = currentLevelId,
+                                completedLevels = completedLevels,
+                                isPremium = isPremium,
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    selectedPhaseIndex = 8
+                                    isPhaseDetailOpened = true
+                                }
+                            )
+                            PhaseGridCard(
+                                phase = GamePhases[9],
+                                currentLevelId = currentLevelId,
+                                completedLevels = completedLevels,
+                                isPremium = isPremium,
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    selectedPhaseIndex = 9
+                                    isPhaseDetailOpened = true
+                                }
+                            )
+                        }
                     }
+                } else {
+                    // =========================================================================
+                    // 2. OPENED PHASE: ENTIRE SECTION DISPLAYS ALL 50 LEVELS OF THIS PHASE
+                    // =========================================================================
+                    val phaseLevels = (currentPhase.startLevel..currentPhase.endLevel).toList()
+                    val completedInPhase = phaseLevels.count { completedLevels.contains(it) || levelProgressMap[it]?.isCompleted == true }
+                    val starsInPhase = phaseLevels.sumOf { levelProgressMap[it]?.stars ?: 0 }
 
-                    // 50 Level Nodes laid out in staggered zigzag rows
-                    val levels = (currentPhase.startLevel..currentPhase.endLevel).toList()
-                    val rows = levels.chunked(3)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 14.dp, vertical = 6.dp)
+                    ) {
+                        // Stage Info Card Header
+                        Surface(
+                            shape = RoundedCornerShape(18.dp),
+                            color = Color(0xFF111827).copy(alpha = 0.9f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, profile.accentGlow.copy(alpha = 0.4f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text(profile.iconSymbol, fontSize = 22.sp)
+                                    Column {
+                                        Text(
+                                            text = currentPhase.title,
+                                            fontWeight = FontWeight.Black,
+                                            fontSize = 15.sp,
+                                            color = Color.White
+                                        )
+                                        Text(
+                                            text = currentPhase.subtitle,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontSize = 11.sp,
+                                            color = Color(0xFF94A3B8)
+                                        )
+                                    }
+                                }
 
-                    itemsIndexed(rows) { rowIndex, rowLevels ->
-                        RoadmapRow(
-                            rowIndex = rowIndex,
-                            rowLevels = rowLevels,
-                            currentLevelId = currentLevelId,
-                            completedLevels = completedLevels,
-                            levelProgressMap = levelProgressMap,
-                            isPremium = isPremium,
-                            profile = profile,
-                            isGooglyMode = isGooglyMode,
-                            onLevelSelected = onLevelSelected,
-                            onPremiumClick = onPremiumClick
-                        )
-                    }
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        text = "$completedInPhase/50 Done",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp,
+                                        color = profile.accentGlow
+                                    )
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                                        Icon(Icons.Default.Star, contentDescription = null, tint = GoldStar, modifier = Modifier.size(12.dp))
+                                        Text(
+                                            text = "$starsInPhase",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Black,
+                                            color = GoldStar
+                                        )
+                                    }
+                                }
+                            }
+                        }
 
-                    item {
-                        Spacer(modifier = Modifier.height(12.dp))
+                        // 50 Levels Grid (Full Screen Level Section)
+                        AnimatedContent(
+                            targetState = currentPhase.phaseNumber,
+                            transitionSpec = {
+                                if (targetState > initialState) {
+                                    slideInHorizontally { width -> width } + fadeIn() togetherWith
+                                            slideOutHorizontally { width -> -width } + fadeOut()
+                                } else {
+                                    slideInHorizontally { width -> -width } + fadeIn() togetherWith
+                                            slideOutHorizontally { width -> width } + fadeOut()
+                                }
+                            },
+                            label = "PhaseGridSectionTransition",
+                            modifier = Modifier.fillMaxSize()
+                        ) { _ ->
+                            LazyVerticalGrid(
+                                columns = GridCells.Fixed(5),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                contentPadding = PaddingValues(bottom = 16.dp),
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                items(phaseLevels) { levelId ->
+                                    val progress = levelProgressMap[levelId]
+                                    val isCompleted = completedLevels.contains(levelId) || (progress?.isCompleted == true)
+                                    val starsEarned = progress?.stars ?: 0
+                                    val maxUnlocked = maxOf(currentLevelId, (completedLevels.maxOrNull() ?: 1))
+                                    val isCurrent = levelId == maxUnlocked && !isCompleted
+                                    val isUnlocked = isPremium || levelId <= maxUnlocked || isCompleted || levelId == 1
+
+                                    FullSectionLevelNode(
+                                        levelId = levelId,
+                                        isCurrent = isCurrent,
+                                        isCompleted = isCompleted,
+                                        isUnlocked = isUnlocked,
+                                        starsEarned = starsEarned,
+                                        profile = profile,
+                                        isGooglyMode = isGooglyMode,
+                                        onClick = {
+                                            if (isUnlocked) {
+                                                onLevelSelected(levelId)
+                                            } else {
+                                                onPremiumClick()
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
-
-                // Ad Banner View (Hidden if Premium)
-                AdBannerView(
-                    isPremium = isPremium,
-                    onRemoveAdsClick = onPremiumClick
-                )
             }
         }
     }
 }
 
+/**
+ * Compact Card for Phase in the 2×3×3×2 Matrix
+ */
 @Composable
-private fun StageHeroBannerCard(
+private fun PhaseGridCard(
     phase: GamePhase,
-    profile: StageVisualProfile,
-    isGooglyMode: Boolean
+    currentLevelId: Int,
+    completedLevels: Set<Int>,
+    isPremium: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
 ) {
-    val cardBrush = if (isGooglyMode) {
-        Brush.horizontalGradient(
-            listOf(
-                Color(0xFFFF007F).copy(alpha = 0.85f),
-                Color(0xFF00E5FF).copy(alpha = 0.85f),
-                Color(0xFF7000FF).copy(alpha = 0.85f)
-            )
+    val profile = StageProfiles.getProfile(phase.phaseNumber)
+    val phaseLevels = phase.startLevel..phase.endLevel
+    val completedCount = phaseLevels.count { completedLevels.contains(it) }
+    val maxUnlocked = maxOf(currentLevelId, (completedLevels.maxOrNull() ?: 1))
+    val isPhaseUnlocked = isPremium || maxUnlocked >= phase.startLevel || phase.phaseNumber == 1
+
+    val borderGlow = if (isPhaseUnlocked) profile.primaryColor.copy(alpha = 0.5f) else Color(0xFF1E293B)
+
+    val backgroundBrush = Brush.linearGradient(
+        listOf(
+            Color(0xFF131D2E).copy(alpha = 0.9f),
+            Color(0xFF0A0F1D).copy(alpha = 0.9f)
         )
-    } else {
-        Brush.horizontalGradient(
-            listOf(
-                profile.primaryColor.copy(alpha = 0.85f),
-                profile.secondaryColor.copy(alpha = 0.85f)
-            )
-        )
-    }
+    )
 
     Surface(
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(14.dp),
         color = Color.Transparent,
-        border = androidx.compose.foundation.BorderStroke(1.dp, profile.accentGlow.copy(alpha = 0.5f)),
-        shadowElevation = 8.dp,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
-            .background(cardBrush)
+        border = androidx.compose.foundation.BorderStroke(1.dp, borderGlow),
+        shadowElevation = 3.dp,
+        modifier = modifier
+            .fillMaxHeight()
+            .clip(RoundedCornerShape(14.dp))
+            .background(backgroundBrush)
+            .clickable { onClick() }
+            .testTag("phase_card_${phase.phaseNumber}")
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
-            contentAlignment = Alignment.CenterStart
+        Column(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "STAGE ${phase.phaseNumber} • ${profile.subtitle.uppercase()}",
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            letterSpacing = 1.2.sp,
-                            fontWeight = FontWeight.Black,
-                            fontSize = 11.sp
-                        ),
-                        color = Color.White.copy(alpha = 0.85f)
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = phase.title,
-                        style = MaterialTheme.typography.headlineMedium.copy(
-                            fontWeight = FontWeight.Black,
-                            fontSize = 24.sp
-                        ),
-                        color = Color.White
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = phase.subtitle,
-                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                        color = Color.White.copy(alpha = 0.9f)
-                    )
-                }
-
-                // Stage Glyphs Symbol
+                // Phase Badge
                 Surface(
                     shape = CircleShape,
-                    color = Color.White.copy(alpha = 0.18f),
-                    modifier = Modifier.size(52.dp)
+                    color = profile.primaryColor.copy(alpha = 0.3f),
+                    modifier = Modifier.size(18.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Text(
-                            text = profile.iconSymbol,
-                            fontSize = 26.sp,
-                            color = Color.White
+                            text = "${phase.phaseNumber}",
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Black,
+                            color = profile.accentGlow
                         )
                     }
                 }
-            }
-        }
-    }
-}
 
-@Composable
-private fun RoadmapRow(
-    rowIndex: Int,
-    rowLevels: List<Int>,
-    currentLevelId: Int,
-    completedLevels: Set<Int>,
-    levelProgressMap: Map<Int, LevelProgressEntity>,
-    isPremium: Boolean,
-    profile: StageVisualProfile,
-    isGooglyMode: Boolean,
-    onLevelSelected: (Int) -> Unit,
-    onPremiumClick: () -> Unit
-) {
-    // Alternate row alignment for organic winding path feel
-    val isReversed = rowIndex % 2 != 0
-    val orderedLevels = if (isReversed) rowLevels.reversed() else rowLevels
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        orderedLevels.forEach { levelId ->
-            val progress = levelProgressMap[levelId]
-            val isCompleted = completedLevels.contains(levelId) || (progress?.isCompleted == true)
-            val starsEarned = progress?.stars ?: 0
-            val isCurrent = levelId == currentLevelId
-            val maxUnlocked = maxOf(currentLevelId, (completedLevels.maxOrNull() ?: 1))
-            val isUnlocked = isPremium || levelId <= maxUnlocked || isCompleted || levelId == 1
-
-            AnimatedLevelNode(
-                levelId = levelId,
-                isCurrent = isCurrent,
-                isCompleted = isCompleted,
-                isUnlocked = isUnlocked,
-                starsEarned = starsEarned,
-                profile = profile,
-                isGooglyMode = isGooglyMode,
-                onClick = {
-                    if (isUnlocked) {
-                        onLevelSelected(levelId)
-                    } else {
-                        onPremiumClick()
-                    }
+                if (!isPhaseUnlocked) {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = "Locked",
+                        tint = Color(0xFF64748B),
+                        modifier = Modifier.size(11.dp)
+                    )
+                } else if (completedCount >= 50) {
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = "Completed",
+                        tint = Color(0xFF10B981),
+                        modifier = Modifier.size(13.dp)
+                    )
                 }
+            }
+
+            // Stage Glyphs Symbol & Title
+            Text(
+                text = profile.iconSymbol,
+                fontSize = 16.sp
+            )
+
+            Text(
+                text = phase.title,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center
+            )
+
+            Text(
+                text = "${phase.startLevel}-${phase.endLevel}",
+                fontSize = 8.5.sp,
+                color = profile.accentGlow,
+                textAlign = TextAlign.Center
+            )
+
+            // Mini completion bar
+            LinearProgressIndicator(
+                progress = { (completedCount / 50f).coerceIn(0f, 1f) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(2.5.dp)
+                    .clip(RoundedCornerShape(1.5.dp)),
+                color = profile.accentGlow,
+                trackColor = Color(0xFF1E293B)
             )
         }
     }
 }
 
 /**
- * Individual Animated Level Node
+ * Full Section Level Node (In the 50 Levels Grid of opened Phase)
  */
 @Composable
-private fun AnimatedLevelNode(
+private fun FullSectionLevelNode(
     levelId: Int,
     isCurrent: Boolean,
     isCompleted: Boolean,
@@ -455,142 +791,92 @@ private fun AnimatedLevelNode(
     isGooglyMode: Boolean,
     onClick: () -> Unit
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "NodePulse_$levelId")
-
-    val pulseGlow by infiniteTransition.animateFloat(
-        initialValue = 0.94f,
-        targetValue = 1.06f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "PulseGlow"
-    )
-
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val pressScale by animateFloatAsState(
         targetValue = if (isPressed) 0.90f else 1f,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-        label = "NodePressScale"
+        label = "FullNodePressScale"
     )
 
-    val nodeSize = 68.dp
+    val nodeBackground = when {
+        isCurrent -> {
+            if (isGooglyMode) {
+                Brush.radialGradient(listOf(Color(0xFFFF007F), Color(0xFF7000FF)))
+            } else {
+                Brush.radialGradient(listOf(profile.primaryColor, profile.secondaryColor))
+            }
+        }
+        isCompleted -> {
+            Brush.radialGradient(listOf(profile.primaryColor.copy(alpha = 0.35f), Color(0xFF1E293B)))
+        }
+        isUnlocked -> {
+            Brush.radialGradient(listOf(Color(0xFF1E293B), Color(0xFF0F172A)))
+        }
+        else -> {
+            Brush.radialGradient(listOf(Color(0xFF0F172A).copy(alpha = 0.5f), Color(0xFF0B1120)))
+        }
+    }
 
-    Box(
+    val borderStroke = when {
+        isCurrent -> androidx.compose.foundation.BorderStroke(2.dp, Color.White)
+        isCompleted -> androidx.compose.foundation.BorderStroke(1.dp, profile.accentGlow.copy(alpha = 0.7f))
+        isUnlocked -> androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF334155))
+        else -> androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1E293B))
+    }
+
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = Color.Transparent,
+        border = borderStroke,
+        shadowElevation = if (isCurrent) 6.dp else 1.dp,
         modifier = Modifier
-            .size(nodeSize + 16.dp)
-            .scale(if (isCurrent) pulseGlow * pressScale else pressScale),
-        contentAlignment = Alignment.Center
+            .aspectRatio(1f)
+            .scale(pressScale)
+            .clip(RoundedCornerShape(12.dp))
+            .background(nodeBackground)
+            .clickable(interactionSource = interactionSource, indication = null) { onClick() }
+            .testTag("level_node_$levelId")
     ) {
-        // 1. Radar Focus Ring for Current Level
-        if (isCurrent) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val center = Offset(size.width / 2f, size.height / 2f)
-                val focusRadius = (nodeSize.toPx() / 2f) + 6.dp.toPx()
-                val ringColor = if (isGooglyMode) Color(0xFFFF007F) else profile.accentGlow
-
-                drawCircle(
-                    color = ringColor.copy(alpha = 0.35f),
-                    radius = focusRadius,
-                    center = center,
-                    style = Stroke(width = 2.dp.toPx())
-                )
-            }
-        }
-
-        // 2. Main Node Circle Body
-        val nodeBackground = when {
-            isCurrent -> {
-                if (isGooglyMode) {
-                    Brush.radialGradient(listOf(Color(0xFFFF007F), Color(0xFF7000FF)))
-                } else {
-                    Brush.radialGradient(listOf(profile.primaryColor, profile.secondaryColor))
-                }
-            }
-            isCompleted -> {
-                if (isGooglyMode) {
-                    Brush.radialGradient(listOf(Color(0xFF00FF66).copy(alpha = 0.3f), Color(0xFF1E293B)))
-                } else {
-                    Brush.radialGradient(listOf(profile.primaryColor.copy(alpha = 0.35f), Color(0xFF1E293B)))
-                }
-            }
-            isUnlocked -> {
-                Brush.radialGradient(listOf(Color(0xFF1E293B), Color(0xFF0F172A)))
-            }
-            else -> {
-                Brush.radialGradient(listOf(Color(0xFF0F172A).copy(alpha = 0.5f), Color(0xFF0B1120)))
-            }
-        }
-
-        val borderStroke = when {
-            isCurrent -> androidx.compose.foundation.BorderStroke(2.dp, Color.White)
-            isCompleted -> androidx.compose.foundation.BorderStroke(1.5.dp, profile.accentGlow)
-            isUnlocked -> androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF475569))
-            else -> androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1E293B))
-        }
-
-        Surface(
-            shape = CircleShape,
-            color = Color.Transparent,
-            border = borderStroke,
-            shadowElevation = if (isCurrent) 10.dp else if (isCompleted) 4.dp else 0.dp,
-            modifier = Modifier
-                .size(nodeSize)
-                .clip(CircleShape)
-                .background(nodeBackground)
-                .clickable(interactionSource = interactionSource, indication = null) { onClick() }
-                .testTag("level_node_$levelId")
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
         ) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                if (!isUnlocked) {
-                    Icon(
-                        imageVector = Icons.Default.Lock,
-                        contentDescription = "Locked",
-                        tint = Color(0xFF64748B),
-                        modifier = Modifier.size(20.dp)
+            if (!isUnlocked) {
+                Icon(
+                    imageVector = Icons.Default.Lock,
+                    contentDescription = "Locked",
+                    tint = Color(0xFF64748B),
+                    modifier = Modifier.size(16.dp)
+                )
+            } else {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = "$levelId",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 13.sp
+                        ),
+                        color = if (isCurrent) Color.White else if (isCompleted) profile.accentGlow else Color.White
                     )
-                } else {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        if (isCurrent) {
-                            Icon(
-                                imageVector = Icons.Default.PlayArrow,
-                                contentDescription = "Current Level",
-                                tint = Color.White,
-                                modifier = Modifier.size(26.dp)
-                            )
-                        } else {
-                            Text(
-                                text = "$levelId",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.ExtraBold,
-                                    fontSize = 15.sp
-                                ),
-                                color = if (isCompleted) profile.accentGlow else Color.White
-                            )
-                        }
 
-                        // Stars Earned Pill
-                        if (isCompleted && starsEarned > 0) {
-                            Row(
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(top = 2.dp)
-                            ) {
-                                for (s in 1..minOf(starsEarned, 3)) {
-                                    Icon(
-                                        imageVector = Icons.Default.Star,
-                                        contentDescription = null,
-                                        tint = GoldStar,
-                                        modifier = Modifier.size(11.dp)
-                                    )
-                                }
+                    // Stars Earned
+                    if (isCompleted && starsEarned > 0) {
+                        Row(
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(top = 1.dp)
+                        ) {
+                            for (s in 1..minOf(starsEarned, 3)) {
+                                Icon(
+                                    imageVector = Icons.Default.Star,
+                                    contentDescription = null,
+                                    tint = GoldStar,
+                                    modifier = Modifier.size(8.dp)
+                                )
                             }
                         }
                     }
