@@ -1,21 +1,63 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# ==============================================================================
+# Arrow Escape ProGuard & R8 Optimization Rules
+# ==============================================================================
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Preserve debugging information in release stack traces
+-keepattributes SourceFile,LineNumberTable
+-keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# ------------------------------------------------------------------------------
+# Kotlin & Coroutines
+# ------------------------------------------------------------------------------
+-keepclassmembers class kotlinx.coroutines.** {
+    volatile <fields>;
+}
+-keep class kotlinx.coroutines.** { *; }
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# ------------------------------------------------------------------------------
+# AndroidX Room Database & Entities
+# ------------------------------------------------------------------------------
+-keep class * extends androidx.room.RoomDatabase
+-dontwarn androidx.room.paging.**
+-keep @androidx.room.Entity class * { *; }
+-keep @androidx.room.Dao interface * { *; }
+-keep @androidx.room.Database class * { *; }
+-keepclassmembers class * extends androidx.room.RoomDatabase {
+    public abstract <methods>;
+}
+-keep class com.mitsara.arrowescape.data.** { *; }
+-keepclassmembers class com.mitsara.arrowescape.data.** { *; }
+
+# ------------------------------------------------------------------------------
+# Game Models & State
+# ------------------------------------------------------------------------------
+-keep class com.mitsara.arrowescape.model.** { *; }
+-keepclassmembers class com.mitsara.arrowescape.model.** { *; }
+-keep enum com.mitsara.arrowescape.model.** { *; }
+
+# ------------------------------------------------------------------------------
+# Monetization & Ads
+# ------------------------------------------------------------------------------
+-keep class com.mitsara.arrowescape.monetization.** { *; }
+-keepclassmembers class com.mitsara.arrowescape.monetization.** { *; }
+-keep class com.google.android.gms.ads.** { *; }
+-keepinterface com.google.android.gms.ads.** { *; }
+-dontwarn com.google.android.gms.ads.**
+
+# ------------------------------------------------------------------------------
+# Android Architecture Components & ViewModels
+# ------------------------------------------------------------------------------
+-keep class * extends androidx.lifecycle.ViewModel {
+    public <init>(...);
+}
+-keep class * extends androidx.lifecycle.AndroidViewModel {
+    public <init>(...);
+}
+-keep class com.mitsara.arrowescape.ui.viewmodel.** { *; }
+
+# ------------------------------------------------------------------------------
+# Audio & System Services
+# ------------------------------------------------------------------------------
+-keep class com.mitsara.arrowescape.audio.** { *; }
+-keepclassmembers class com.mitsara.arrowescape.audio.** { *; }
+
