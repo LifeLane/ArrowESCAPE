@@ -21,6 +21,8 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.Vibration
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -70,6 +72,8 @@ fun SettingsScreen(
     userSettings: UserSettingsEntity,
     onToggleSound: () -> Unit,
     onToggleVibration: () -> Unit,
+    onChangeHapticLevel: (String) -> Unit = {},
+    onToggleCloudSync: () -> Unit = {},
     onToggleAutoFirstMoveSuggestion: () -> Unit = {},
     onSelectTheme: (String) -> Unit = {},
     onRestorePurchases: () -> Unit,
@@ -142,6 +146,72 @@ fun SettingsScreen(
                             checked = userSettings.vibrationEnabled,
                             onCheckedChange = { onToggleVibration() },
                             modifier = Modifier.testTag("vibration_switch")
+                        )
+                    }
+
+                    if (userSettings.vibrationEnabled) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(text = "Haptic Intensity", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            listOf("OFF", "LIGHT", "MEDIUM", "HEAVY").forEach { level ->
+                                val isSelected = userSettings.hapticLevel.equals(level, ignoreCase = true)
+                                Button(
+                                    onClick = { onChangeHapticLevel(level) },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (isSelected) PrimaryBlue else MaterialTheme.colorScheme.surfaceVariant
+                                    ),
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.weight(1f).height(36.dp),
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+                                ) {
+                                    Text(
+                                        text = level,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isSelected) Color.White else TextPrimary
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Cloud Sync & Account Card
+            Card(
+                colors = CardDefaults.cardColors(containerColor = SurfaceCard),
+                shape = RoundedCornerShape(20.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(text = "CLOUD SYNC & BACKUP", style = MaterialTheme.typography.labelLarge, color = TextSecondary)
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Icon(imageVector = Icons.Default.Refresh, contentDescription = null, tint = TextPrimary)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(text = "Google Play Cloud Sync", color = TextPrimary, fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    text = if (userSettings.cloudSyncEnabled) "Status: Synced securely with cloud" else "Status: Local offline save only",
+                                    color = if (userSettings.cloudSyncEnabled) Color(0xFF4CAF50) else TextSecondary,
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+                        Switch(
+                            checked = userSettings.cloudSyncEnabled,
+                            onCheckedChange = { onToggleCloudSync() },
+                            modifier = Modifier.testTag("cloud_sync_switch")
                         )
                     }
                 }

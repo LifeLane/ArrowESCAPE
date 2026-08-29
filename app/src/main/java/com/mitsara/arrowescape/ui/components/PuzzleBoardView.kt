@@ -22,7 +22,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
@@ -35,6 +39,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.IntOffset
@@ -88,8 +93,13 @@ fun PuzzleBoardView(
         label = "hintPulseScale"
     )
 
-    // Escape progress animation
+    // Escape progress animation with spring-based momentum physics
     val escapeProgress = remember(animatingArrowId) { Animatable(0f) }
+    
+    // Tactile press scale feedback for tapped arrow
+    val pressScale = remember { Animatable(1f) }
+    val scope = rememberCoroutineScope()
+    var pressedArrowId by remember { mutableStateOf<Int?>(null) }
     
     // Store recent escapes for particle effects
     val particles = remember { mutableStateListOf<EscapeParticle>() }
@@ -101,7 +111,7 @@ fun PuzzleBoardView(
                 targetValue = 1.0f,
                 animationSpec = spring(
                     dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = 180f
+                    stiffness = 150f
                 )
             )
             
@@ -109,13 +119,13 @@ fun PuzzleBoardView(
             val arrow = activeArrows.find { it.id == animatingArrowId }
             if (arrow != null) {
                 val tip = arrow.getTipCell()
-                for (i in 0..10) {
+                for (i in 0..12) {
                     particles.add(
                         EscapeParticle(
                             x = tip.x.toFloat(),
                             y = tip.y.toFloat(),
-                            vx = (Math.random() - 0.5).toFloat() * 3f,
-                            vy = (Math.random() - 0.5).toFloat() * 3f,
+                            vx = (Math.random() - 0.5).toFloat() * 4f,
+                            vy = (Math.random() - 0.5).toFloat() * 4f,
                             life = 1f
                         )
                     )
@@ -131,9 +141,9 @@ fun PuzzleBoardView(
                 val iter = particles.iterator()
                 while(iter.hasNext()) {
                     val p = iter.next()
-                    p.x += p.vx * 0.1f
-                    p.y += p.vy * 0.1f
-                    p.life -= 0.05f
+                    p.x += p.vx * 0.12f
+                    p.y += p.vy * 0.12f
+                    p.life -= 0.04f
                     if (p.life <= 0) iter.remove()
                 }
             }
@@ -163,6 +173,17 @@ fun PuzzleBoardView(
                         arrow.getOccupiedCells().contains(tappedPoint)
                     }
                     if (tappedArrow != null) {
+                        pressedArrowId = tappedArrow.id
+                        scope.launch {
+                            pressScale.snapTo(0.88f)
+                            pressScale.animateTo(
+                                targetValue = 1f,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioLowBouncy,
+                                    stiffness = 300f
+                                )
+                            )
+                        }
                         onArrowClick(tappedArrow.id)
                     }
                 }
@@ -324,6 +345,8 @@ fun PuzzleBoardView(
                     )
                 }
 
+                val arrowScale = if (arrow.id == pressedArrowId) pressScale.value else 1f
+
                 translate(left = offsetX, top = offsetY) {
                     drawArrowGraphics(
                         arrow = arrow,
@@ -333,6 +356,7 @@ fun PuzzleBoardView(
                         isHinted = isHintedThis,
                         hintScale = hintPulseScale,
                         alpha = animAlpha,
+                        scale = arrowScale,
                         theme = theme
                     )
                 }
@@ -383,13 +407,22 @@ private fun DrawScope.drawArrowGraphics(
     isHinted: Boolean,
     hintScale: Float,
     alpha: Float,
+    scale: Float = 1.0f,
     theme: GameTheme
 ) {
     val occupiedCells = arrow.getOccupiedCells()
     if (occupiedCells.isEmpty()) return
 
-    val arrowColor = getArrowColor(arrow, isHinted, theme)
-    val tileMargin = minOf(cellWidthPx, cellHeightPx) * 0.08f
+    val sumX = occupiedCells.sumOf { it.x.toDouble() } / occupiedCells.size
+    val sumY = occupiedCells.sumOf { it.y.toDouble() } / occupiedCells.size
+    val arrowCenter = Offset(
+        (sumX * cellWidthPx + cellWidthPx / 2).toFloat(),
+        (sumY * cellHeightPx + cellHeightPx / 2).toFloat()
+    )
+
+    scale(scale = scale, pivot = arrowCenter) {
+        val arrowColor = getArrowColor(arrow, isHinted, theme)
+        val tileMargin = minOf(cellWidthPx, cellHeightPx) * 0.08f
 
     // Draw rounded tile block background for each occupied cell of the arrow
     for (pt in occupiedCells) {
@@ -498,4 +531,5 @@ private fun DrawScope.drawArrowGraphics(
             center = tipCenter
         )
     }
+}
 }

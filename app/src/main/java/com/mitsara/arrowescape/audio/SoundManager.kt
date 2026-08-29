@@ -17,6 +17,7 @@ class SoundManager(private val context: Context) {
 
     var soundEnabled: Boolean = true
     var vibrationEnabled: Boolean = true
+    var hapticLevel: String = "MEDIUM" // OFF, LIGHT, MEDIUM, HEAVY
 
     private val scope = CoroutineScope(Dispatchers.Default)
 
@@ -70,14 +71,24 @@ class SoundManager(private val context: Context) {
     }
 
     private fun vibrate(durationMs: Long, strength: Int = 128) {
-        if (!vibrationEnabled || vibrator == null || !vibrator!!.hasVibrator()) return
+        if (!vibrationEnabled || hapticLevel == "OFF" || vibrator == null || !vibrator!!.hasVibrator()) return
+        val adjustedDuration = when (hapticLevel) {
+            "LIGHT" -> (durationMs * 0.6).toLong()
+            "HEAVY" -> (durationMs * 1.4).toLong()
+            else -> durationMs
+        }
+        val adjustedStrength = when (hapticLevel) {
+            "LIGHT" -> 80
+            "HEAVY" -> 255
+            else -> strength
+        }
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val effect = VibrationEffect.createOneShot(durationMs, strength.coerceIn(1, 255))
+                val effect = VibrationEffect.createOneShot(adjustedDuration, adjustedStrength.coerceIn(1, 255))
                 vibrator?.vibrate(effect)
             } else {
                 @Suppress("DEPRECATION")
-                vibrator?.vibrate(durationMs)
+                vibrator?.vibrate(adjustedDuration)
             }
         } catch (e: Exception) {
             // Ignore vibration permission or hardware errors

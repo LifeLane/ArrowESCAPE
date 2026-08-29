@@ -19,6 +19,8 @@ data class UserSettingsEntity(
     val hintsCount: Int = 5,
     val soundEnabled: Boolean = true,
     val vibrationEnabled: Boolean = true,
+    val hapticLevel: String = "MEDIUM", // OFF, LIGHT, MEDIUM, HEAVY
+    val cloudSyncEnabled: Boolean = false,
     val autoFirstMoveSuggestion: Boolean = false,
     val isPremium: Boolean = false,
     val totalStars: Int = 0,

@@ -28,7 +28,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -50,10 +50,12 @@ fun DailyChallengeScreen(
     onStartDailyPuzzle: (Int) -> Unit,
     onBackClick: () -> Unit
 ) {
+    var isSpeedrunMode by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Daily Challenge", fontWeight = FontWeight.Bold) },
+                title = { Text("Daily Challenges & Speedrun", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -73,34 +75,70 @@ fun DailyChallengeScreen(
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                // Mode Switcher Tabs
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(SurfaceCard, RoundedCornerShape(16.dp))
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    Button(
+                        onClick = { isSpeedrunMode = false },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (!isSpeedrunMode) PrimaryBlue else Color.Transparent
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Daily Puzzle", color = if (!isSpeedrunMode) Color.White else TextSecondary, fontWeight = FontWeight.Bold)
+                    }
+                    Button(
+                        onClick = { isSpeedrunMode = true },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isSpeedrunMode) PrimaryBlue else Color.Transparent
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Speedrun Time Trial", color = if (isSpeedrunMode) Color.White else TextSecondary, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
                 Surface(
                     shape = RoundedCornerShape(24.dp),
                     color = SurfaceCard,
                     shadowElevation = 6.dp,
-                    modifier = Modifier.padding(vertical = 16.dp)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(
                         modifier = Modifier.padding(24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Icon(
-                            imageVector = Icons.Default.DateRange,
+                            imageVector = if (isSpeedrunMode) Icons.Default.PlayArrow else Icons.Default.DateRange,
                             contentDescription = null,
-                            tint = HintGlowColor,
+                            tint = if (isSpeedrunMode) Color(0xFFFF5722) else HintGlowColor,
                             modifier = Modifier.size(64.dp)
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = "TODAY'S SPECIAL PUZZLE",
+                            text = if (isSpeedrunMode) "60-SECOND SPEEDRUN TRIAL" else "TODAY'S SPECIAL PUZZLE",
                             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                            color = TextPrimary
+                            color = TextPrimary,
+                            textAlign = TextAlign.Center
                         )
                         Text(
-                            text = "Solve today's custom layout to keep your streak alive!",
+                            text = if (isSpeedrunMode) 
+                                "Race against the clock! Clear the grid within 60 seconds to earn the Elite Speedrunner Badge & 2x Star Multiplier."
+                            else 
+                                "Solve today's custom layout to keep your streak alive and unlock bonus hints!",
                             style = MaterialTheme.typography.bodyLarge.copy(fontSize = 13.sp),
                             color = TextSecondary,
                             textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(top = 4.dp)
+                            modifier = Modifier.padding(top = 8.dp)
                         )
 
                         Spacer(modifier = Modifier.height(20.dp))
@@ -110,15 +148,19 @@ fun DailyChallengeScreen(
                         ) {
                             Icon(imageVector = Icons.Default.Star, contentDescription = null, tint = GoldStar)
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text(text = "Reward: +3 Bonus Hints", fontWeight = FontWeight.Bold, color = TextPrimary)
+                            Text(
+                                text = if (isSpeedrunMode) "Reward: 2x Stars + Speed Badge" else "Reward: +3 Bonus Hints", 
+                                fontWeight = FontWeight.Bold, 
+                                color = TextPrimary
+                            )
                         }
                     }
                 }
             }
 
             Button(
-                onClick = { onStartDailyPuzzle(42) }, // Daily seed level
-                colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                onClick = { onStartDailyPuzzle(if (isSpeedrunMode) 999 else 42) },
+                colors = ButtonDefaults.buttonColors(containerColor = if (isSpeedrunMode) Color(0xFFFF5722) else PrimaryBlue),
                 shape = RoundedCornerShape(18.dp),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -127,7 +169,7 @@ fun DailyChallengeScreen(
                 Icon(imageVector = Icons.Default.PlayArrow, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "START DAILY PUZZLE",
+                    text = if (isSpeedrunMode) "START SPEEDRUN TRIAL" else "START DAILY PUZZLE",
                     style = MaterialTheme.typography.titleLarge.copy(fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 )
             }

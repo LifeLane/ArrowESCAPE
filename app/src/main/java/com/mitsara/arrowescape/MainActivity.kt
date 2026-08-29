@@ -177,6 +177,8 @@ fun ArrowEscapeApp(viewModel: GameViewModel) {
                 userSettings = userSettings,
                 onToggleSound = { viewModel.toggleSound() },
                 onToggleVibration = { viewModel.toggleVibration() },
+                onChangeHapticLevel = { level -> viewModel.setHapticLevel(level) },
+                onToggleCloudSync = { viewModel.setCloudSync(!userSettings.cloudSyncEnabled) },
                 onToggleAutoFirstMoveSuggestion = { viewModel.toggleAutoFirstMoveSuggestion() },
                 onSelectTheme = { themeId -> viewModel.selectTheme(themeId) },
                 onRestorePurchases = { viewModel.setPremiumStatus(true) },

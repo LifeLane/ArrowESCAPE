@@ -57,6 +57,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             userSettings.collect { settings ->
                 soundManager.soundEnabled = settings.soundEnabled
                 soundManager.vibrationEnabled = settings.vibrationEnabled
+                soundManager.hapticLevel = settings.hapticLevel
                 SubscriptionManager.updatePremiumState(settings.isPremium)
             }
         }
@@ -329,6 +330,18 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             _gameState.update { state ->
                 state?.copy(hintsAvailable = (state.hintsAvailable + count))
             }
+        }
+    }
+
+    fun setHapticLevel(level: String) {
+        viewModelScope.launch {
+            repository.updateSettings { it.copy(hapticLevel = level) }
+        }
+    }
+
+    fun setCloudSync(enabled: Boolean) {
+        viewModelScope.launch {
+            repository.updateSettings { it.copy(cloudSyncEnabled = enabled) }
         }
     }
 
