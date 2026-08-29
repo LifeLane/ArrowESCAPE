@@ -39,6 +39,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.platform.testTag
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -47,6 +48,7 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Button
@@ -79,16 +81,6 @@ fun GameplayScreen(
     val gameState by viewModel.gameState.collectAsState()
     val userSettings by viewModel.userSettings.collectAsState()
 
-    var showControlsOverlay by remember { mutableStateOf(true) }
-
-    // Auto-hide controls after 3 seconds of inactivity
-    LaunchedEffect(showControlsOverlay) {
-        if (showControlsOverlay) {
-            delay(3500)
-            showControlsOverlay = false
-        }
-    }
-
     val wipeProgress = remember { androidx.compose.animation.core.Animatable(0f) }
     LaunchedEffect(levelId) {
         if (gameState?.level?.id != levelId) {
@@ -111,12 +103,8 @@ fun GameplayScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .clickable(
-                indication = null,
-                interactionSource = remember { MutableInteractionSource() }
-            ) {
-                showControlsOverlay = true
-            }
+            .windowInsetsPadding(WindowInsets.systemBars)
+            .background(activeTheme.boardCanvasColor)
     ) {
         // Procedural Immersive Background Engine
         com.mitsara.arrowescape.engine.graphics.BackgroundEngine(
@@ -124,193 +112,143 @@ fun GameplayScreen(
             flowState = state.flowState
         )
 
-        // Full Screen Edge-to-Edge Game Board (Occupies entire screen viewport)
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.systemBars),
-            contentAlignment = Alignment.Center
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            PuzzleBoardView(
-                gridWidth = state.level.gridWidth,
-                gridHeight = state.level.gridHeight,
-                activeArrows = state.activeArrows,
-                animatingArrowId = state.animatingArrowId,
-                animatingDirection = state.animatingDirection,
-                hintArrowId = state.hintArrowId,
-                isMistakeShake = state.isMistakeShake,
-                inspectedArrowId = state.inspectedArrowId,
-                onArrowClick = { arrowId ->
-                    showControlsOverlay = true
-                    viewModel.onArrowTapped(arrowId)
-                },
-                theme = activeTheme,
-                validCells = state.level.validCells,
-                obstacles = state.level.obstacles,
-                modifier = Modifier.fillMaxSize().padding(12.dp)
-            )
-        }
+            // Always Visible Single-Row Top Header Bar
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(activeTheme.surfaceBackgroundColor.copy(alpha = 0.9f), RoundedCornerShape(20.dp))
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onBackClick, modifier = Modifier.testTag("back_button").size(36.dp)) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = activeTheme.textPrimaryColor, modifier = Modifier.size(20.dp))
+                    }
+                    IconButton(
+                        onClick = {
+                            val allThemes = ThemeManager.allThemes
+                            val currentIdx = allThemes.indexOfFirst { it.id == activeTheme.id }
+                            val nextTheme = allThemes[(currentIdx + 1) % allThemes.size]
+                            viewModel.selectTheme(nextTheme.id)
+                        },
+                        modifier = Modifier.testTag("theme_toggle_button").size(36.dp)
+                    ) {
+                        Icon(Icons.Default.Palette, contentDescription = "Toggle Theme", tint = activeTheme.arrowHighlightColor, modifier = Modifier.size(20.dp))
+                    }
+                    // Powerup Button (Fire/Crusher Arrow)
+                    if (state.powerupCharges > 0 || state.isPowerupActive) {
+                        Button(
+                            onClick = { viewModel.togglePowerup() },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (state.isPowerupActive) Color(0xFFFF3366) else activeTheme.arrowHighlightColor
+                            ),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                            modifier = Modifier.height(32.dp).testTag("powerup_button")
+                        ) {
+                            Icon(Icons.Default.FlashOn, contentDescription = null, tint = Color.Black, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Text("x${state.powerupCharges}", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
 
-        // Transparent Auto-Hiding Controls Overlay using WindowInsets
-        AnimatedVisibility(
-            visible = showControlsOverlay,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier.fillMaxSize()
-        ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "LVL ${state.level.id}",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                        color = activeTheme.textPrimaryColor
+                    )
+                    Text(
+                        text = "${state.activeArrows.size} LEFT",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp, fontWeight = FontWeight.SemiBold),
+                        color = activeTheme.arrowHighlightColor
+                    )
+                }
+
+                IconButton(onClick = onSettingsClick, modifier = Modifier.testTag("settings_button").size(36.dp)) {
+                    Icon(Icons.Outlined.Settings, contentDescription = "Settings", tint = activeTheme.textPrimaryColor, modifier = Modifier.size(20.dp))
+                }
+            }
+
+            // Game Board filling entire central area as grids
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .windowInsetsPadding(WindowInsets.systemBars)
-                    .background(Color.Black.copy(alpha = 0.25f))
-                    .padding(horizontal = 16.dp, vertical = 16.dp),
-                contentAlignment = Alignment.TopCenter
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.SpaceBetween,
-                    horizontalAlignment = Alignment.CenterHorizontally
+                PuzzleBoardView(
+                    gridWidth = state.level.gridWidth,
+                    gridHeight = state.level.gridHeight,
+                    activeArrows = state.activeArrows,
+                    animatingArrowId = state.animatingArrowId,
+                    animatingDirection = state.animatingDirection,
+                    hintArrowId = state.hintArrowId,
+                    isMistakeShake = state.isMistakeShake,
+                    inspectedArrowId = state.inspectedArrowId,
+                    onArrowClick = { arrowId -> viewModel.onArrowTapped(arrowId) },
+                    theme = activeTheme,
+                    validCells = state.level.validCells,
+                    obstacles = state.level.obstacles,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            // Always Visible Single-Row Bottom Footer Bar
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(activeTheme.surfaceBackgroundColor.copy(alpha = 0.9f), RoundedCornerShape(20.dp))
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedButton(
+                    onClick = { viewModel.undoMove() },
+                    enabled = state.canUndo,
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    modifier = Modifier.height(38.dp)
                 ) {
-                    // Minimal Floating Top Bar with Back, Theme Toggle, Level Info & Settings
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(activeTheme.surfaceBackgroundColor.copy(alpha = 0.9f), RoundedCornerShape(20.dp))
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(
-                                onClick = {
-                                    showControlsOverlay = true
-                                    onBackClick()
-                                },
-                                modifier = Modifier.testTag("back_button")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "Back",
-                                    tint = activeTheme.textPrimaryColor
-                                )
-                            }
-                            
-                            // Floating Theme Toggle Icon
-                            IconButton(
-                                onClick = {
-                                    showControlsOverlay = true
-                                    val allThemes = ThemeManager.allThemes
-                                    val currentIdx = allThemes.indexOfFirst { it.id == activeTheme.id }
-                                    val nextTheme = allThemes[(currentIdx + 1) % allThemes.size]
-                                    viewModel.selectTheme(nextTheme.id)
-                                },
-                                modifier = Modifier.testTag("theme_toggle_button")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Palette,
-                                    contentDescription = "Toggle Theme",
-                                    tint = activeTheme.arrowHighlightColor
-                                )
-                            }
-                        }
+                    Icon(Icons.Default.Refresh, contentDescription = null, tint = activeTheme.textPrimaryColor, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(2.dp))
+                    Text("Undo", color = activeTheme.textPrimaryColor, fontSize = 11.sp)
+                }
 
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = "LEVEL ${state.level.id}",
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp),
-                                color = activeTheme.textPrimaryColor
-                            )
-                            Text(
-                                text = "${state.activeArrows.size} ARROWS LEFT",
-                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold, fontSize = 10.sp),
-                                color = activeTheme.arrowHighlightColor
-                            )
-                        }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Favorite, contentDescription = "Lives", tint = Color(0xFFEF4444), modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(2.dp))
+                    Text(text = "x${state.remainingLives}", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = activeTheme.textPrimaryColor)
+                }
 
-                        IconButton(
-                            onClick = {
-                                showControlsOverlay = true
-                                onSettingsClick()
-                            },
-                            modifier = Modifier.testTag("settings_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Settings,
-                                contentDescription = "Settings",
-                                tint = activeTheme.textPrimaryColor
-                            )
-                        }
-                    }
+                Button(
+                    onClick = { viewModel.requestHint() },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = activeTheme.arrowHighlightColor),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    modifier = Modifier.height(38.dp)
+                ) {
+                    Icon(Icons.Default.Lightbulb, contentDescription = null, tint = Color.Black, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(2.dp))
+                    Text("Hint (${state.hintsAvailable})", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                }
 
-                    Spacer(modifier = Modifier.weight(1f))
-
-                    // Minimal Floating Bottom Action Bar with Undo, Lives, Hint, and Retry
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(activeTheme.surfaceBackgroundColor.copy(alpha = 0.9f), RoundedCornerShape(24.dp))
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        OutlinedButton(
-                            onClick = {
-                                showControlsOverlay = true
-                                viewModel.undoMove()
-                            },
-                            enabled = state.canUndo,
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier.height(44.dp)
-                        ) {
-                            Icon(Icons.Default.Refresh, contentDescription = null, tint = activeTheme.textPrimaryColor, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Undo", color = activeTheme.textPrimaryColor, fontSize = 12.sp)
-                        }
-
-                        // Lives Counter Badge
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 4.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Favorite,
-                                contentDescription = "Lives",
-                                tint = Color(0xFFEF4444),
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "x${state.remainingLives}",
-                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                                color = activeTheme.textPrimaryColor
-                            )
-                        }
-
-                        Button(
-                            onClick = {
-                                showControlsOverlay = true
-                                viewModel.requestHint()
-                            },
-                            shape = RoundedCornerShape(16.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = activeTheme.arrowHighlightColor),
-                            modifier = Modifier.height(44.dp)
-                        ) {
-                            Icon(Icons.Default.Lightbulb, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Hint (${state.hintsAvailable})", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        }
-
-                        OutlinedButton(
-                            onClick = {
-                                showControlsOverlay = true
-                                viewModel.retryLevel()
-                            },
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier.height(44.dp)
-                        ) {
-                            Text("Retry", color = activeTheme.textPrimaryColor, fontSize = 12.sp)
-                        }
-                    }
+                OutlinedButton(
+                    onClick = { viewModel.retryLevel() },
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    modifier = Modifier.height(38.dp)
+                ) {
+                    Text("Retry", color = activeTheme.textPrimaryColor, fontSize = 11.sp)
                 }
             }
         }

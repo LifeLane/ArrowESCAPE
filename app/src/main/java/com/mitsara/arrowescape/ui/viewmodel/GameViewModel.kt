@@ -107,11 +107,20 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         startTimer()
     }
 
+    fun togglePowerup() {
+        val state = _gameState.value ?: return
+        if (state.powerupCharges > 0 && !state.isCompleted && !state.isFailed) {
+            soundManager.playHintSound()
+            _gameState.update { it?.copy(isPowerupActive = !it.isPowerupActive) }
+        }
+    }
+
     fun onArrowTapped(arrowId: Int) {
         val currentState = _gameState.value ?: return
         if (currentState.isCompleted || currentState.isFailed || currentState.animatingArrowId != null) return
 
-        soundManager.playTapSound()
+        val themeId = userSettings.value.selectedTheme
+        soundManager.playTapSound(themeId)
 
         val arrow = currentState.activeArrows.find { it.id == arrowId } ?: return
         val isUnobstructed = PuzzleSolver.isArrowUnobstructed(
@@ -122,9 +131,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             obstacles = currentState.level.obstacles
         )
 
-        if (isUnobstructed) {
-            // SUCCESSFUL ARROW ESCAPE!
-            soundManager.playEscapeSound()
+        val canEscape = isUnobstructed || (currentState.isPowerupActive && currentState.powerupCharges > 0)
+
+        if (canEscape) {
+            if (currentState.isPowerupActive) {
+                soundManager.playPowerupBlastSound()
+            } else {
+                soundManager.playEscapeSound(themeId)
+            }
 
             val historyEntry = com.mitsara.arrowescape.model.MoveHistoryEntry(
                 activeArrows = currentState.activeArrows,
@@ -142,6 +156,18 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             val comboMsg = if (newCombo > 1) "${newCombo}x COMBO!" else null
             val moveScore = 150 * newCombo
 
+            val usedPowerup = currentState.isPowerupActive
+            val newCharges = if (usedPowerup) maxOf(0, currentState.powerupCharges - 1) else currentState.powerupCharges
+            val earnedCharge = if (!usedPowerup && newCombo >= 5 && newCharges < 3) 1 else 0
+            val finalCharges = newCharges + earnedCharge
+
+            val updatedObstacles = if (usedPowerup) {
+                val ray = arrow.getExitRay(currentState.level.gridWidth, currentState.level.gridHeight)
+                currentState.level.obstacles.filter { obs -> !ray.contains(obs) }.toSet()
+            } else {
+                currentState.level.obstacles
+            }
+
             viewModelScope.launch {
                 // Set animation state
                 _gameState.update { state ->
@@ -155,7 +181,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                         comboMultiplier = newCombo,
                         lastEscapeTimestamp = now,
                         activeComboMessage = comboMsg,
-                        score = (state?.score ?: 0) + moveScore
+                        score = (state?.score ?: 0) + moveScore,
+                        powerupCharges = finalCharges,
+                        isPowerupActive = false,
+                        level = state.level.copy(obstacles = updatedObstacles)
                     )
                 }
 
@@ -214,7 +243,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                         flowCount = 0,
                         inspectedArrowId = arrowId,
                         comboMultiplier = 1,
-                        activeComboMessage = null
+                        activeComboMessage = null,
+                        isPowerupActive = false
                     )
                 }
 

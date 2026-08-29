@@ -139,7 +139,9 @@ data class GamePlayState(
     val hintCooldown: Int = 0,
     val comboMultiplier: Int = 1,
     val lastEscapeTimestamp: Long = 0L,
-    val activeComboMessage: String? = null
+    val activeComboMessage: String? = null,
+    val powerupCharges: Int = 0,
+    val isPowerupActive: Boolean = false
 ) {
     val flowState: Int get() = (flowCount / 3).coerceIn(0, 3)
     val canUndo: Boolean get() = moveHistory.isNotEmpty() && !isCompleted && !isFailed

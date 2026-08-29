@@ -31,20 +31,42 @@ class SoundManager(private val context: Context) {
         }
     }
 
-    fun playTapSound() {
+    fun playTapSound(themeId: String = "RETRO_ARCADE") {
         if (!soundEnabled) return
+        val freq = when (themeId) {
+            "CYBER_TERMINAL" -> 783.99 // G5 laser click
+            "ZEN_WOOD" -> 440.0 // A4 woodblock click
+            "VAPORWAVE" -> 659.25 // E5 synth click
+            "QUANTUM_NEBULA" -> 880.0 // A5 cosmic chime
+            else -> 587.33 // D5 arcade click
+        }
         scope.launch {
-            playTone(frequency = 587.33, durationMs = 40, attack = 0.05, decay = 0.95) // D5 click
+            playTone(frequency = freq, durationMs = 35, attack = 0.05, decay = 0.95)
         }
         vibrate(durationMs = 12, strength = 40)
     }
 
-    fun playEscapeSound() {
+    fun playEscapeSound(themeId: String = "RETRO_ARCADE") {
         if (!soundEnabled) return
+        val freqs = when (themeId) {
+            "CYBER_TERMINAL" -> listOf(440.0, 554.37, 659.25, 880.0) // Cyber synth arpeggio
+            "ZEN_WOOD" -> listOf(329.63, 392.00, 493.88, 659.25) // Zen cedar chime
+            "VAPORWAVE" -> listOf(523.25, 622.25, 783.99, 1046.50) // Synthwave chord sweep
+            "QUANTUM_NEBULA" -> listOf(587.33, 739.99, 880.00, 1174.66) // Starlight arpeggio
+            else -> listOf(523.25, 659.25, 783.99, 1046.50) // Retro sweep
+        }
         scope.launch {
-            playArpeggio(listOf(523.25, 659.25, 783.99, 1046.50), noteDurationMs = 35) // C5-E5-G5-C6 sweep
+            playArpeggio(freqs, noteDurationMs = 30)
         }
         vibrate(durationMs = 25, strength = 80)
+    }
+
+    fun playPowerupBlastSound() {
+        if (!soundEnabled) return
+        scope.launch {
+            playArpeggio(listOf(200.0, 350.0, 550.0, 900.0, 1400.0), noteDurationMs = 45) // Fire/Crusher explosion sweep
+        }
+        vibrate(durationMs = 180, strength = 255)
     }
 
     fun playMistakeSound() {
