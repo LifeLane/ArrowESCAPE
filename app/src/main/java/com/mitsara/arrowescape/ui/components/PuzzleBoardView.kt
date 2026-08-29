@@ -45,6 +45,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.mutableStateListOf
+import kotlin.math.max
+import kotlin.math.sqrt
+import com.mitsara.arrowescape.engine.EscapePathEngine
 import com.mitsara.arrowescape.engine.PuzzleSolver
 import com.mitsara.arrowescape.model.Arrow
 import com.mitsara.arrowescape.model.Direction
@@ -93,7 +96,7 @@ fun PuzzleBoardView(
         label = "hintPulseScale"
     )
 
-    // Escape progress animation with spring-based momentum physics
+    // Escape progress animation driven by path length
     val escapeProgress = remember(animatingArrowId) { Animatable(0f) }
     
     // Tactile press scale feedback for tapped arrow
@@ -106,17 +109,21 @@ fun PuzzleBoardView(
     
     LaunchedEffect(animatingArrowId) {
         if (animatingArrowId != null) {
+            val arrow = activeArrows.find { it.id == animatingArrowId }
+            val animDurationMs = if (arrow != null) {
+                EscapePathEngine.calculateEscapeDurationMs(arrow, gridWidth, gridHeight)
+            } else 400
+
             escapeProgress.snapTo(0f)
             escapeProgress.animateTo(
                 targetValue = 1.0f,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = 150f
+                animationSpec = tween(
+                    durationMillis = animDurationMs,
+                    easing = LinearEasing
                 )
             )
             
             // Generate particles at tip when animation finishes
-            val arrow = activeArrows.find { it.id == animatingArrowId }
             if (arrow != null) {
                 val tip = arrow.getTipCell()
                 for (i in 0..12) {
@@ -263,102 +270,81 @@ fun PuzzleBoardView(
                 val isInspectedThis = arrow.id == inspectedArrowId
                 val isUnobstructed = PuzzleSolver.isArrowUnobstructed(arrow, activeArrows, gridWidth, gridHeight, obstacles)
 
-                val animProgressVal = if (isAnimatingThis) escapeProgress.value else 0f
-                val escapeDir = arrow.getTipDirection()
-                
-                // Smooth snake-like sliding along grid axes without fading or side curving
-                val boardSpan = minOf(size.width, size.height) * 2.5f
-                val travelDist = animProgressVal * boardSpan
-                
-                val offsetX = escapeDir.dx * travelDist
-                val offsetY = escapeDir.dy * travelDist
-                val animAlpha = 1.0f // Fully opaque as it slides off the board like a snake
-                val escapeScale = 1.0f
-
-                // Laser inspection ray when tapped while blocked
-                if (isInspectedThis) {
-                    val tip = arrow.getTipCell()
-                    val startOffset = Offset(tip.x * cW + cW / 2, tip.y * cH + cH / 2)
-                    
-                    val occupiedCells = HashSet<GridPoint>()
-                    for (other in activeArrows) {
-                        if (other.id != arrow.id) {
-                            occupiedCells.addAll(other.getOccupiedCells())
-                        }
-                    }
-                    occupiedCells.addAll(obstacles)
-                    
-                    val ray = arrow.getExitRay(gridWidth, gridHeight)
-                    var hitPoint: GridPoint? = null
-                    for (pt in ray) {
-                        if (occupiedCells.contains(pt)) {
-                            hitPoint = pt
-                            break
-                        }
-                    }
-                    
-                    val endOffset = if (hitPoint != null) {
-                        Offset(hitPoint.x * cW + cW / 2, hitPoint.y * cH + cH / 2)
-                    } else {
-                        val lastRayPt = ray.lastOrNull() ?: tip
-                        Offset(lastRayPt.x * cW + cW / 2, lastRayPt.y * cH + cH / 2) + Offset(escapeDir.dx * cW, escapeDir.dy * cH)
-                    }
-
-                    // Outer red laser glow
-                    drawLine(
-                        color = Color(0xFFEF4444).copy(alpha = 0.7f),
-                        start = startOffset,
-                        end = endOffset,
-                        strokeWidth = minOf(cW, cH) * 0.25f,
-                        cap = StrokeCap.Round
-                    )
-                    // Inner brilliant core laser
-                    drawLine(
-                        color = Color.White.copy(alpha = 0.95f),
-                        start = startOffset,
-                        end = endOffset,
-                        strokeWidth = minOf(cW, cH) * 0.1f,
-                        cap = StrokeCap.Round
-                    )
-
-                    if (hitPoint != null) {
-                        drawCircle(
-                            color = Color(0xFFEF4444),
-                            radius = minOf(cW, cH) * 0.35f,
-                            center = endOffset
-                        )
-                        drawCircle(
-                            color = Color.White,
-                            radius = minOf(cW, cH) * 0.15f,
-                            center = endOffset
-                        )
-                    }
-                }
-
-                // Lightweight glowing neon sparkle trail when escaping
                 if (isAnimatingThis) {
-                    val tip = arrow.getTipCell()
-                    val startCenter = Offset(tip.x * cW + cW / 2, tip.y * cH + cH / 2)
-                    val currentCenter = Offset(startCenter.x + offsetX, startCenter.y + offsetY)
-                    
-                    // Draw delicate fading particle spark dots along the wake
-                    for (i in 1..3) {
-                        val sparkOffset = i * 15f
-                        val sparkCenter = Offset(
-                            currentCenter.x - escapeDir.dx * sparkOffset,
-                            currentCenter.y - escapeDir.dy * sparkOffset
+                    // Physical route-following escape animation
+                    drawEscapingArrow(
+                        arrow = arrow,
+                        gridWidth = gridWidth,
+                        gridHeight = gridHeight,
+                        cellWidthPx = cW,
+                        cellHeightPx = cH,
+                        progress = escapeProgress.value,
+                        theme = theme
+                    )
+                } else {
+                    // Laser inspection ray when tapped while blocked
+                    if (isInspectedThis) {
+                        val tip = arrow.getTipCell()
+                        val tipDir = arrow.getTipDirection()
+                        val startOffset = Offset(tip.x * cW + cW / 2, tip.y * cH + cH / 2)
+                        
+                        val occupiedCells = HashSet<GridPoint>()
+                        for (other in activeArrows) {
+                            if (other.id != arrow.id) {
+                                occupiedCells.addAll(other.getOccupiedCells())
+                            }
+                        }
+                        occupiedCells.addAll(obstacles)
+                        
+                        val ray = arrow.getExitRay(gridWidth, gridHeight)
+                        var hitPoint: GridPoint? = null
+                        for (pt in ray) {
+                            if (occupiedCells.contains(pt)) {
+                                hitPoint = pt
+                                break
+                            }
+                        }
+                        
+                        val endOffset = if (hitPoint != null) {
+                            Offset(hitPoint.x * cW + cW / 2, hitPoint.y * cH + cH / 2)
+                        } else {
+                            val lastRayPt = ray.lastOrNull() ?: tip
+                            Offset(lastRayPt.x * cW + cW / 2, lastRayPt.y * cH + cH / 2) + Offset(tipDir.dx * cW, tipDir.dy * cH)
+                        }
+
+                        // Outer red laser glow
+                        drawLine(
+                            color = Color(0xFFEF4444).copy(alpha = 0.7f),
+                            start = startOffset,
+                            end = endOffset,
+                            strokeWidth = minOf(cW, cH) * 0.25f,
+                            cap = StrokeCap.Round
                         )
-                        drawCircle(
-                            color = theme.arrowHighlightColor.copy(alpha = (animAlpha * (0.6f / i)).coerceIn(0f, 1f)),
-                            radius = (minOf(cW, cH) * 0.15f / i),
-                            center = sparkCenter
+                        // Inner brilliant core laser
+                        drawLine(
+                            color = Color.White.copy(alpha = 0.95f),
+                            start = startOffset,
+                            end = endOffset,
+                            strokeWidth = minOf(cW, cH) * 0.1f,
+                            cap = StrokeCap.Round
                         )
+
+                        if (hitPoint != null) {
+                            drawCircle(
+                                color = Color(0xFFEF4444),
+                                radius = minOf(cW, cH) * 0.35f,
+                                center = endOffset
+                            )
+                            drawCircle(
+                                color = Color.White,
+                                radius = minOf(cW, cH) * 0.15f,
+                                center = endOffset
+                            )
+                        }
                     }
-                }
 
-                val arrowScale = (if (arrow.id == pressedArrowId) pressScale.value else 1.0f) * escapeScale
+                    val arrowScale = if (arrow.id == pressedArrowId) pressScale.value else 1.0f
 
-                translate(left = offsetX, top = offsetY) {
                     drawArrowGraphics(
                         arrow = arrow,
                         cellWidthPx = cW,
@@ -366,7 +352,7 @@ fun PuzzleBoardView(
                         isUnobstructed = isUnobstructed,
                         isHinted = isHintedThis,
                         hintScale = hintPulseScale,
-                        alpha = animAlpha,
+                        alpha = 1.0f,
                         scale = arrowScale,
                         theme = theme
                     )
@@ -408,6 +394,127 @@ private fun getArrowColor(arrow: Arrow, isHinted: Boolean, theme: GameTheme): Co
         }
     }
     return gamePalette[(arrow.id - 1) % gamePalette.size]
+}
+
+private fun DrawScope.drawEscapingArrow(
+    arrow: Arrow,
+    gridWidth: Int,
+    gridHeight: Int,
+    cellWidthPx: Float,
+    cellHeightPx: Float,
+    progress: Float,
+    theme: GameTheme
+) {
+    val occupiedCells = arrow.getOccupiedCells()
+    if (occupiedCells.isEmpty()) return
+
+    val arrowColor = getArrowColor(arrow, false, theme)
+    val strokeWidth = minOf(cellWidthPx, cellHeightPx) * 0.12f
+    val headLength = minOf(cellWidthPx, cellHeightPx) * 0.35f
+    val headWidth = minOf(cellWidthPx, cellHeightPx) * 0.40f
+
+    // 1. Build escape route waypoints and continuous parameterized path
+    val waypoints = EscapePathEngine.buildEscapeWaypoints(arrow, gridWidth, gridHeight, cellWidthPx, cellHeightPx)
+    val cornerRadiusPx = minOf(cellWidthPx, cellHeightPx) * 0.40f
+    val boardSize = max(cellWidthPx * gridWidth, cellHeightPx * gridHeight)
+    val path = EscapePathEngine.ParameterizedPath(
+        keyVertices = waypoints,
+        cornerRadiusPx = cornerRadiusPx,
+        boardBoundsSize = boardSize
+    )
+
+    // 2. Calculate arrow rest body length
+    var bodyRestLength = 0f
+    for (i in 0 until occupiedCells.size - 1) {
+        val p1 = occupiedCells[i]
+        val p2 = occupiedCells[i + 1]
+        val dx = (p2.x - p1.x) * cellWidthPx
+        val dy = (p2.y - p1.y) * cellHeightPx
+        bodyRestLength += sqrt(dx * dx + dy * dy)
+    }
+
+    val totalTravelDistance = path.totalLength + cellWidthPx
+    val distanceTraveled = EscapePathEngine.calculateTravelDistance(progress, totalTravelDistance)
+
+    val uTail = distanceTraveled
+    val uTip = distanceTraveled + bodyRestLength
+
+    if (uTail >= path.totalLength && progress >= 0.99f) return
+
+    val tipSample = path.sampleAt(uTip)
+    val tipPos = tipSample.position
+    val tipAngleDeg = tipSample.angleDegrees
+
+    // 3. Draw body if arrow has length > 1
+    if (bodyRestLength > 0.01f) {
+        val bodyPath = path.buildBodyPath(uTail, uTip)
+
+        // Outer translucent neon glow aura along shaft
+        drawPath(
+            path = bodyPath,
+            color = arrowColor.copy(alpha = 0.4f),
+            style = Stroke(
+                width = strokeWidth * 2.2f,
+                cap = StrokeCap.Round,
+                join = StrokeJoin.Round
+            )
+        )
+
+        // Parallel fiber laser lines
+        drawPath(
+            path = bodyPath,
+            color = arrowColor.copy(alpha = 0.6f),
+            style = Stroke(
+                width = strokeWidth * 0.5f,
+                cap = StrokeCap.Round,
+                join = StrokeJoin.Round
+            )
+        )
+
+        // Crisp inner core line shaft
+        drawPath(
+            path = bodyPath,
+            color = Color.White.copy(alpha = 0.95f),
+            style = Stroke(
+                width = strokeWidth * 0.8f,
+                cap = StrokeCap.Round,
+                join = StrokeJoin.Round
+            )
+        )
+    }
+
+    // 4. Draw glowing Arrowhead at tip oriented with the path tangent angle
+    rotate(degrees = tipAngleDeg, pivot = tipPos) {
+        val headPath = Path().apply {
+            moveTo(tipPos.x, tipPos.y - headLength * 0.7f) // Apex
+            lineTo(tipPos.x - headWidth / 2, tipPos.y + headLength * 0.35f)
+            lineTo(tipPos.x, tipPos.y + headLength * 0.15f)
+            lineTo(tipPos.x + headWidth / 2, tipPos.y + headLength * 0.35f)
+            close()
+        }
+
+        // Outer arrowhead glow
+        drawPath(
+            path = headPath,
+            color = arrowColor.copy(alpha = 0.6f)
+        )
+        // Inner bright arrowhead face
+        drawPath(
+            path = headPath,
+            color = Color.White.copy(alpha = 0.95f)
+        )
+    }
+
+    // 5. Draw delicate glowing particle spark dots trailing along the wake behind tip
+    for (i in 1..3) {
+        val sparkDist = i * (minOf(cellWidthPx, cellHeightPx) * 0.25f)
+        val sparkSample = path.sampleAt(max(0f, uTip - sparkDist))
+        drawCircle(
+            color = theme.arrowHighlightColor.copy(alpha = (0.6f / i).coerceIn(0f, 1f)),
+            radius = (minOf(cellWidthPx, cellHeightPx) * 0.14f / i),
+            center = sparkSample.position
+        )
+    }
 }
 
 private fun DrawScope.drawArrowGraphics(

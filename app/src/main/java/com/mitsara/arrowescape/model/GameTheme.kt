@@ -111,7 +111,25 @@ object ThemeManager {
         surfaceBackgroundColor = Color(0xFF080714)
     )
 
-    val allThemes = listOf(RETRO_ARCADE, CYBER_TERMINAL, ZEN_WOOD, VAPORWAVE, QUANTUM_NEBULA)
+    val GOOGLY = GameTheme(
+        id = "GOOGLY",
+        displayName = "Googly Rainbow Party",
+        consoleStyleName = "Rainbow Neon Carnival",
+        isPremiumOnly = false,
+        palette = listOf(Color(0xFFFF3366), Color(0xFFFFB800), Color(0xFF00E676), Color(0xFF00E5FF), Color(0xFFAA00FF)),
+        gridStyle = "Rainbow Polka Dots",
+        arrowStyle = "Googly Animated Dart",
+        backgroundShaderName = "Prismatic Color Shift",
+        animationSpeedMs = 160,
+        boardCanvasColor = Color(0xFF0F172A),
+        gridDotColor = Color(0xFFFF007F),
+        arrowNormalColor = Color(0xFF00E5FF),
+        arrowHighlightColor = Color(0xFFFFEE00),
+        textPrimaryColor = Color(0xFFF8FAFC),
+        surfaceBackgroundColor = Color(0xFF020617)
+    )
+
+    val allThemes = listOf(RETRO_ARCADE, GOOGLY, CYBER_TERMINAL, ZEN_WOOD, VAPORWAVE, QUANTUM_NEBULA)
 
     val entries = allThemes
 

@@ -83,10 +83,16 @@ fun ArrowEscapeApp(viewModel: GameViewModel) {
             )
         }
         is Screen.MainMenu -> {
+            val isGoogly = userSettings.selectedTheme.equals("GOOGLY", ignoreCase = true)
             MainMenuScreen(
                 currentLevelId = userSettings.currentLevelId,
                 totalStars = userSettings.totalStars,
                 isPremium = userSettings.isPremium,
+                selectedTheme = userSettings.selectedTheme,
+                onToggleGooglyTheme = {
+                    val nextTheme = if (isGoogly) "RETRO_ARCADE" else "GOOGLY"
+                    viewModel.selectTheme(nextTheme)
+                },
                 onPlayClick = {
                     currentScreen = Screen.Gameplay(userSettings.currentLevelId)
                 },
@@ -119,6 +125,7 @@ fun ArrowEscapeApp(viewModel: GameViewModel) {
                 currentLevelId = userSettings.currentLevelId,
                 completedLevels = completedLevels,
                 levelProgressMap = levelProgressMap,
+                selectedTheme = userSettings.selectedTheme,
                 isPremium = userSettings.isPremium,
                 onPremiumClick = { currentScreen = Screen.Premium },
                 onLevelSelected = { levelId ->

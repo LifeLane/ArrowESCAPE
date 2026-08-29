@@ -1,5 +1,6 @@
 package com.mitsara.arrowescape
 
+import com.mitsara.arrowescape.engine.EscapePathEngine
 import com.mitsara.arrowescape.engine.LevelGenerator
 import com.mitsara.arrowescape.engine.PuzzleSolver
 import com.mitsara.arrowescape.model.Arrow
@@ -10,8 +11,92 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.math.abs
 
 class ArrowEscapeUnitTest {
+
+    @Test
+    fun testEscapePathEngineDurationCalculation() {
+        val shortArrow = Arrow(id = 1, startX = 0, startY = 0, length = 1, direction = Direction.UP)
+        val shortDuration = EscapePathEngine.calculateEscapeDurationMs(shortArrow, 6, 6)
+
+        val longArrow = Arrow(id = 2, startX = 0, startY = 5, length = 1, direction = Direction.UP)
+        val longDuration = EscapePathEngine.calculateEscapeDurationMs(longArrow, 6, 6)
+
+        assertTrue("Short path duration should be smaller than long path duration", shortDuration < longDuration)
+        assertTrue("Duration should be >= 320ms", shortDuration >= 320)
+        assertTrue("Duration should be <= 750ms", longDuration <= 750)
+    }
+
+    @Test
+    fun testEscapePathEngineLShapedRouteAndCornerFillet() {
+        // L-shaped arrow: path from (1, 4) -> (1, 2) -> (3, 2)
+        val bentArrow = Arrow(
+            id = 1,
+            startX = 1,
+            startY = 4,
+            length = 5,
+            direction = Direction.RIGHT,
+            pathPoints = listOf(
+                GridPoint(1, 4),
+                GridPoint(1, 3),
+                GridPoint(1, 2),
+                GridPoint(2, 2),
+                GridPoint(3, 2)
+            )
+        )
+
+        val cellWidth = 100f
+        val cellHeight = 100f
+        val waypoints = EscapePathEngine.buildEscapeWaypoints(bentArrow, 6, 6, cellWidth, cellHeight)
+
+        // Verify waypoints include starting tail, corner at (1,2), exit ray, and offscreen
+        assertTrue("Waypoints should have at least 3 key vertices", waypoints.size >= 3)
+
+        val path = EscapePathEngine.ParameterizedPath(
+            keyVertices = waypoints,
+            cornerRadiusPx = 40f,
+            boardBoundsSize = 600f
+        )
+
+        assertTrue("Path total length should be positive", path.totalLength > 500f)
+
+        // Sample at start (progress = 0): angle should be pointing UP (0°)
+        val sampleStart = path.sampleAt(0f)
+        assertEquals("Initial segment moving up should have 0° angle", 0f, sampleStart.angleDegrees, 1.0f)
+
+        // Sample along corner: angle should smoothly transition between 0° and 90°
+        val cornerDist = 200f // distance to corner vertex
+        val sampleBeforeCorner = path.sampleAt(140f) // before fillet start (160f)
+        val sampleMidCorner = path.sampleAt(200f) // midpoint of fillet
+        val sampleAfterCorner = path.sampleAt(260f) // after fillet end (240f)
+
+        assertEquals("Before corner fillet should be ~0°", 0f, sampleBeforeCorner.angleDegrees, 1.0f)
+        assertTrue("Mid corner angle should be between 20° and 70° (actual: ${sampleMidCorner.angleDegrees})",
+            sampleMidCorner.angleDegrees in 20f..70f)
+        assertEquals("After corner fillet should be ~90° (RIGHT)", 90f, sampleAfterCorner.angleDegrees, 1.0f)
+
+        // Sample near offscreen end: angle should stay locked to 90° (exit direction)
+        val sampleExit = path.sampleAt(path.totalLength - 100f)
+        assertEquals("Exit trajectory must be aligned with 90°", 90f, sampleExit.angleDegrees, 1.0f)
+    }
+
+    @Test
+    fun testEscapePathEngineTravelDistanceEasing() {
+        val totalDist = 1000f
+        val dist0 = EscapePathEngine.calculateTravelDistance(0f, totalDist)
+        val distHalf = EscapePathEngine.calculateTravelDistance(0.5f, totalDist)
+        val distEnd = EscapePathEngine.calculateTravelDistance(1.0f, totalDist)
+
+        assertEquals("Start distance should be 0", 0f, dist0, 0.01f)
+        assertEquals("End distance should equal total length", totalDist, distEnd, 0.01f)
+        assertTrue("Distance at midpoint should be positive and less than total", distHalf in 100f..900f)
+
+        // Verify speed acceleration: slope in second half > slope in first half
+        val deltaFirstHalf = distHalf - dist0
+        val deltaSecondHalf = distEnd - distHalf
+        assertTrue("Second half of travel should have higher speed than first half for fly-away", deltaSecondHalf > deltaFirstHalf)
+    }
 
     @Test
     fun testUnobstructedArrowDetection() {

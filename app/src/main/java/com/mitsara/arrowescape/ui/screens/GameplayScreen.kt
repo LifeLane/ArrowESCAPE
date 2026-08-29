@@ -266,6 +266,7 @@ fun GameplayScreen(
                 moveCount = state.moveCount,
                 score = state.score,
                 elapsedSeconds = state.elapsedSeconds,
+                theme = activeTheme,
                 onNextLevel = {
                     AdsManager.showInterstitial(context, userSettings.isPremium) {
                         viewModel.nextLevel()

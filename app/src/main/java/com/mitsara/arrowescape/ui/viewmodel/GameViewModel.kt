@@ -168,6 +168,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 currentState.level.obstacles
             }
 
+            val animDurationMs = com.mitsara.arrowescape.engine.EscapePathEngine.calculateEscapeDurationMs(
+                arrow = arrow,
+                gridWidth = currentState.level.gridWidth,
+                gridHeight = currentState.level.gridHeight
+            )
+
             viewModelScope.launch {
                 // Set animation state
                 _gameState.update { state ->
@@ -188,7 +194,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
 
-                delay(225) // Animation duration
+                delay(animDurationMs.toLong()) // Path length based animation duration
 
                 // Commit escape
                 val updatedState = _gameState.value ?: return@launch
