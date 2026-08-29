@@ -60,6 +60,26 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 SubscriptionManager.updatePremiumState(settings.isPremium)
             }
         }
+        viewModelScope.launch {
+            repository.checkDailyStreak()
+        }
+    }
+
+    private var timerJob: kotlinx.coroutines.Job? = null
+
+    private fun startTimer() {
+        timerJob?.cancel()
+        timerJob = viewModelScope.launch {
+            while (true) {
+                delay(1000)
+                _gameState.update { state ->
+                    if (state == null || state.isCompleted || state.isFailed) return@update state
+                    val newElapsed = state.elapsedSeconds + 1
+                    val newCooldown = if (state.hintCooldown > 0) state.hintCooldown - 1 else 0
+                    state.copy(elapsedSeconds = newElapsed, hintCooldown = newCooldown)
+                }
+            }
+        }
     }
 
     fun startLevel(levelId: Int) {
@@ -71,7 +91,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             PuzzleSolver.getHintArrowId(
                 activeArrows = level.arrows,
                 gridWidth = level.gridWidth,
-                gridHeight = level.gridHeight
+                gridHeight = level.gridHeight,
+                obstacles = level.obstacles
             )
         } else null
 
@@ -82,6 +103,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             hintsAvailable = if (userSettings.value.isPremium) 999 else initialHints,
             hintArrowId = initialHintId
         )
+        startTimer()
     }
 
     fun onArrowTapped(arrowId: Int) {
@@ -95,7 +117,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             arrow = arrow,
             activeArrows = currentState.activeArrows,
             gridWidth = currentState.level.gridWidth,
-            gridHeight = currentState.level.gridHeight
+            gridHeight = currentState.level.gridHeight,
+            obstacles = currentState.level.obstacles
         )
 
         if (isUnobstructed) {
@@ -108,6 +131,16 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 moveCount = currentState.moveCount
             )
 
+            val now = System.currentTimeMillis()
+            val timeSinceLast = now - currentState.lastEscapeTimestamp
+            val newCombo = if (timeSinceLast < 3500L && currentState.lastEscapeTimestamp > 0L) {
+                minOf(5, currentState.comboMultiplier + 1)
+            } else {
+                1
+            }
+            val comboMsg = if (newCombo > 1) "${newCombo}x COMBO!" else null
+            val moveScore = 150 * newCombo
+
             viewModelScope.launch {
                 // Set animation state
                 _gameState.update { state ->
@@ -115,17 +148,31 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                         animatingArrowId = arrowId,
                         animatingDirection = arrow.direction,
                         hintArrowId = null,
-                        moveCount = state.moveCount + 1,
-                        moveHistory = state.moveHistory + historyEntry
+                        moveCount = (state?.moveCount ?: 0) + 1,
+                        flowCount = (state?.flowCount ?: 0) + 1,
+                        moveHistory = (state?.moveHistory ?: emptyList()) + historyEntry,
+                        comboMultiplier = newCombo,
+                        lastEscapeTimestamp = now,
+                        activeComboMessage = comboMsg,
+                        score = (state?.score ?: 0) + moveScore
                     )
                 }
 
-                delay(220) // Animation duration
+                delay(225) // Animation duration
 
                 // Commit escape
-                val remainingArrows = currentState.activeArrows.filter { it.id != arrowId }
-                val newEscaped = currentState.escapedArrowIds + arrowId
+                val updatedState = _gameState.value ?: return@launch
+                val remainingArrows = updatedState.activeArrows.filter { it.id != arrowId }
+                val newEscaped = updatedState.escapedArrowIds + arrowId
                 val isLevelCleared = remainingArrows.isEmpty()
+
+                val finalScore = if (isLevelCleared) {
+                    val timeBonus = maxOf(0, 4000 - updatedState.elapsedSeconds * 30)
+                    val lifeBonus = updatedState.remainingLives * 1500
+                    updatedState.score + timeBonus + lifeBonus
+                } else {
+                    updatedState.score
+                }
 
                 _gameState.update { state ->
                     state?.copy(
@@ -133,21 +180,22 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                         escapedArrowIds = newEscaped,
                         animatingArrowId = null,
                         animatingDirection = null,
-                        isCompleted = isLevelCleared
+                        isCompleted = isLevelCleared,
+                        score = finalScore
                     )
                 }
 
                 if (isLevelCleared) {
                     soundManager.playVictorySound()
                     val stars = when {
-                        currentState.remainingLives >= 3 -> 3
-                        currentState.remainingLives == 2 -> 2
+                        updatedState.remainingLives >= 3 -> 3
+                        updatedState.remainingLives == 2 -> 2
                         else -> 1
                     }
                     repository.markLevelCompleted(
-                        levelId = currentState.level.id,
+                        levelId = updatedState.level.id,
                         stars = stars,
-                        moveCount = currentState.moveCount + 1
+                        moveCount = updatedState.moveCount
                     )
                 }
             }
@@ -161,14 +209,18 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     state?.copy(
                         remainingLives = newLives,
                         isMistakeShake = true,
-                        isFailed = newLives <= 0
+                        isFailed = newLives <= 0,
+                        flowCount = 0,
+                        inspectedArrowId = arrowId,
+                        comboMultiplier = 1,
+                        activeComboMessage = null
                     )
                 }
 
-                delay(400)
+                delay(600)
 
                 _gameState.update { state ->
-                    state?.copy(isMistakeShake = false)
+                    state?.copy(isMistakeShake = false, inspectedArrowId = null)
                 }
             }
         }
@@ -187,6 +239,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 activeArrows = lastEntry.activeArrows,
                 escapedArrowIds = lastEntry.escapedArrowIds,
                 moveCount = lastEntry.moveCount,
+                flowCount = 0,
                 moveHistory = updatedHistory,
                 hintArrowId = null,
                 animatingArrowId = null,
@@ -197,15 +250,16 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     fun requestHint() {
         val currentState = _gameState.value ?: return
-        if (currentState.isCompleted || currentState.isFailed) return
+        if (currentState.isCompleted || currentState.isFailed || currentState.hintCooldown > 0) return
 
         viewModelScope.launch {
             val hasHint = repository.consumeHint()
-            if (hasHint) {
+            if (hasHint || userSettings.value.isPremium) {
                 val hintId = PuzzleSolver.getHintArrowId(
                     activeArrows = currentState.activeArrows,
                     gridWidth = currentState.level.gridWidth,
-                    gridHeight = currentState.level.gridHeight
+                    gridHeight = currentState.level.gridHeight,
+                    obstacles = currentState.level.obstacles
                 )
 
                 if (hintId != null) {
@@ -213,7 +267,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     _gameState.update { state ->
                         state?.copy(
                             hintArrowId = hintId,
-                            hintsAvailable = if (userSettings.value.isPremium) 999 else maxOf(0, state.hintsAvailable - 1)
+                            hintsAvailable = if (userSettings.value.isPremium) 999 else maxOf(0, state.hintsAvailable - 1),
+                            hintCooldown = 5
                         )
                     }
                 }
@@ -224,6 +279,18 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     fun selectTheme(themeId: String) {
         viewModelScope.launch {
             repository.updateSettings { it.copy(selectedTheme = themeId) }
+        }
+    }
+
+    fun unlockSkin(skinId: String, cost: Int) {
+        viewModelScope.launch {
+            repository.unlockSkin(skinId, cost)
+        }
+    }
+
+    fun selectSkin(skinId: String) {
+        viewModelScope.launch {
+            repository.selectSkin(skinId)
         }
     }
 

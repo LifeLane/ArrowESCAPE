@@ -1,5 +1,6 @@
 package com.mitsara.arrowescape.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -83,12 +84,12 @@ fun LevelSelectScreen(
                 title = {
                     Text(
                         text = "Select Level",
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold)
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", modifier = Modifier.size(28.dp))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceLight)
@@ -104,7 +105,8 @@ fun LevelSelectScreen(
             TabRow(
                 selectedTabIndex = selectedTabIndex,
                 containerColor = SurfaceLight,
-                contentColor = PrimaryBlue
+                contentColor = PrimaryBlue,
+                divider = { Spacer(modifier = Modifier.height(1.dp).fillMaxWidth().background(Color(0xFFE2E8F0))) }
             ) {
                 difficultyTabs.forEachIndexed { index, title ->
                     Tab(
@@ -112,10 +114,9 @@ fun LevelSelectScreen(
                         onClick = { selectedTabIndex = index },
                         text = {
                             Text(
-                                text = title,
-                                style = MaterialTheme.typography.labelLarge.copy(
-                                    fontSize = 11.sp,
-                                    fontWeight = if (selectedTabIndex == index) FontWeight.Bold else FontWeight.Normal
+                                text = title.substringBefore(" "),
+                                style = MaterialTheme.typography.titleSmall.copy(
+                                    fontWeight = if (selectedTabIndex == index) FontWeight.Bold else FontWeight.Medium
                                 )
                             )
                         }
@@ -125,9 +126,9 @@ fun LevelSelectScreen(
 
             LazyVerticalGrid(
                 columns = GridCells.Fixed(4),
-                contentPadding = PaddingValues(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(20.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier.weight(1f)
             ) {
                 items(levelRange.count()) { idx ->
@@ -140,17 +141,17 @@ fun LevelSelectScreen(
                     val isUnlocked = isPremium || levelId <= maxUnlocked || isCompleted || levelId == 1
 
                     Surface(
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(20.dp),
                         color = when {
                             isCurrent -> PrimaryBlue
-                            isCompleted -> Color(0xFFDCFCE7)
-                            isUnlocked -> SurfaceCard
-                            else -> Color(0xFFE2E8F0)
+                            isCompleted -> Color(0xFFE0F7FA) // Light Cyan for completed
+                            isUnlocked -> Color.White
+                            else -> Color(0xFFF1F5F9)
                         },
-                        shadowElevation = if (isUnlocked) 4.dp else 0.dp,
+                        shadowElevation = if (isUnlocked && !isCurrent && !isCompleted) 4.dp else if(isCurrent) 8.dp else 0.dp,
                         modifier = Modifier
                             .aspectRatio(1f)
-                            .clip(RoundedCornerShape(16.dp))
+                            .clip(RoundedCornerShape(20.dp))
                             .clickable {
                                 if (isUnlocked) {
                                     onLevelSelected(levelId)
@@ -168,8 +169,8 @@ fun LevelSelectScreen(
                                 Icon(
                                     imageVector = Icons.Default.Lock,
                                     contentDescription = "Locked Level",
-                                    tint = TextSecondary,
-                                    modifier = Modifier.size(20.dp)
+                                    tint = TextSecondary.copy(alpha = 0.5f),
+                                    modifier = Modifier.size(24.dp)
                                 )
                             } else {
                                 Column(
@@ -178,18 +179,18 @@ fun LevelSelectScreen(
                                 ) {
                                     Text(
                                         text = "$levelId",
-                                        style = MaterialTheme.typography.titleLarge.copy(
-                                            fontSize = 17.sp,
-                                            fontWeight = FontWeight.Bold
+                                        style = MaterialTheme.typography.headlineSmall.copy(
+                                            fontWeight = FontWeight.ExtraBold
                                         ),
                                         color = when {
                                             isCurrent -> Color.White
-                                            isCompleted -> Color(0xFF15803D)
+                                            isCompleted -> Color(0xFF00796B)
                                             else -> TextPrimary
                                         }
                                     )
 
                                     if (isCompleted) {
+                                        Spacer(modifier = Modifier.height(2.dp))
                                         Row(
                                             horizontalArrangement = Arrangement.Center,
                                             verticalAlignment = Alignment.CenterVertically
@@ -199,7 +200,7 @@ fun LevelSelectScreen(
                                                     imageVector = Icons.Default.Star,
                                                     contentDescription = null,
                                                     tint = if (s <= starsEarned) GoldStar else HeartEmptyGray,
-                                                    modifier = Modifier.size(11.dp)
+                                                    modifier = Modifier.size(14.dp)
                                                 )
                                             }
                                         }

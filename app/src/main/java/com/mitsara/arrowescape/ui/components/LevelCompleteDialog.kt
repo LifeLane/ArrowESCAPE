@@ -38,14 +38,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.mitsara.arrowescape.engine.LevelTextEngine
+import com.mitsara.arrowescape.model.Direction
+import com.mitsara.arrowescape.model.PuzzleLevel
 import com.mitsara.arrowescape.ui.theme.ArrowNavyDark
 import com.mitsara.arrowescape.ui.theme.PrimaryBlue
 
 @Composable
 fun LevelCompleteDialog(
-    levelNumber: Int,
+    level: PuzzleLevel,
     stars: Int,
     moveCount: Int,
+    score: Int,
+    elapsedSeconds: Int,
     onNextLevel: () -> Unit,
     onReplay: () -> Unit,
     onMainMenu: () -> Unit
@@ -63,6 +68,8 @@ fun LevelCompleteDialog(
                 .testTag("level_complete_dialog"),
             contentAlignment = Alignment.Center
         ) {
+            VictoryParticleOverlay(modifier = Modifier.fillMaxSize())
+
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
@@ -70,9 +77,9 @@ fun LevelCompleteDialog(
             ) {
                 // Top Header Text Banner (Screenshot 5)
                 Text(
-                    text = "Train Your Brain",
+                    text = "Score: $score | Time: ${elapsedSeconds}s",
                     style = MaterialTheme.typography.titleMedium.copy(
-                        fontSize = 18.sp,
+                        fontSize = 16.sp,
                         fontWeight = FontWeight.Bold
                     ),
                     color = Color.White.copy(alpha = 0.9f),
@@ -91,9 +98,22 @@ fun LevelCompleteDialog(
                     textAlign = TextAlign.Center
                 )
 
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = LevelTextEngine.getFunFactForLevel(level.id),
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontWeight = FontWeight.Medium,
+                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                    ),
+                    color = Color.White.copy(alpha = 0.85f),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+
                 Spacer(modifier = Modifier.height(28.dp))
 
-                // Center White Card with Vector Maze Graphics (Screenshot 5)
+                // Center White Card with Vector Maze Graphics
                 Surface(
                     shape = RoundedCornerShape(24.dp),
                     color = Color.White,
@@ -113,46 +133,75 @@ fun LevelCompleteDialog(
                         Canvas(modifier = Modifier.fillMaxSize()) {
                             val w = size.width
                             val h = size.height
-
+                            
+                            val gw = level.gridWidth
+                            val gh = level.gridHeight
+                            val cellW = w / gw
+                            val cellH = h / gh
+                            
                             // Grid dots
-                            for (ix in 0..4) {
-                                for (iy in 0..4) {
+                            for (ix in 1 until gw) {
+                                for (iy in 1 until gh) {
                                     drawCircle(
                                         color = Color(0xFFE2E8F0),
-                                        radius = 3.dp.toPx(),
-                                        center = Offset(w * (ix + 1) / 6f, h * (iy + 1) / 6f)
+                                        radius = 2.dp.toPx(),
+                                        center = Offset(ix * cellW, iy * cellH)
                                     )
                                 }
                             }
 
-                            // Sample celebratory maze path graphic
-                            val path1 = Path().apply {
-                                moveTo(w * 2 / 6f, h * 4 / 6f)
-                                lineTo(w * 2 / 6f, h * 2 / 6f)
-                                lineTo(w * 4 / 6f, h * 2 / 6f)
+                            // Draw the initial level arrows statically
+                            for (arrow in level.arrows) {
+                                val cx = arrow.startX * cellW + cellW / 2
+                                val cy = arrow.startY * cellH + cellH / 2
+                                
+                                val path = Path()
+                                val arrowSize = minOf(cellW, cellH) * 0.4f
+                                
+                                when (arrow.direction) {
+                                    Direction.UP -> {
+                                        path.moveTo(cx, cy + arrowSize)
+                                        path.lineTo(cx, cy - arrowSize)
+                                        path.moveTo(cx - arrowSize * 0.5f, cy)
+                                        path.lineTo(cx, cy - arrowSize)
+                                        path.lineTo(cx + arrowSize * 0.5f, cy)
+                                    }
+                                    Direction.DOWN -> {
+                                        path.moveTo(cx, cy - arrowSize)
+                                        path.lineTo(cx, cy + arrowSize)
+                                        path.moveTo(cx - arrowSize * 0.5f, cy)
+                                        path.lineTo(cx, cy + arrowSize)
+                                        path.lineTo(cx + arrowSize * 0.5f, cy)
+                                    }
+                                    Direction.LEFT -> {
+                                        path.moveTo(cx + arrowSize, cy)
+                                        path.lineTo(cx - arrowSize, cy)
+                                        path.moveTo(cx, cy - arrowSize * 0.5f)
+                                        path.lineTo(cx - arrowSize, cy)
+                                        path.lineTo(cx, cy + arrowSize * 0.5f)
+                                    }
+                                    Direction.RIGHT -> {
+                                        path.moveTo(cx - arrowSize, cy)
+                                        path.lineTo(cx + arrowSize, cy)
+                                        path.moveTo(cx, cy - arrowSize * 0.5f)
+                                        path.lineTo(cx + arrowSize, cy)
+                                        path.lineTo(cx, cy + arrowSize * 0.5f)
+                                    }
+                                }
+                                
+                                drawPath(
+                                    path = path,
+                                    color = ArrowNavyDark,
+                                    style = Stroke(width = 6.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+                                )
                             }
-                            drawPath(
-                                path = path1,
-                                color = ArrowNavyDark,
-                                style = Stroke(width = 16.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
-                            )
-
-                            val path2 = Path().apply {
-                                moveTo(w * 4 / 6f, h * 4 / 6f)
-                                lineTo(w * 5 / 6f, h * 4 / 6f)
-                            }
-                            drawPath(
-                                path = path2,
-                                color = PrimaryBlue,
-                                style = Stroke(width = 16.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
-                            )
                         }
                     }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Primary Large White Pill Button: "New Game" / "Next Level" (Screenshot 5)
+                // Primary Large White Pill Button: "New Game" / "Next Level"
                 Button(
                     onClick = onNextLevel,
                     colors = ButtonDefaults.buttonColors(

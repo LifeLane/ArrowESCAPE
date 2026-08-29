@@ -105,7 +105,9 @@ data class PuzzleLevel(
     val gridHeight: Int,
     val arrows: List<Arrow>,
     val startingLives: Int = 3,
-    val maxHints: Int = 3
+    val maxHints: Int = 3,
+    val validCells: Set<GridPoint>? = null,
+    val obstacles: Set<GridPoint> = emptySet()
 )
 
 @Immutable
@@ -127,9 +129,18 @@ data class GamePlayState(
     val remainingLives: Int = 3,
     val hintsAvailable: Int = 3,
     val moveCount: Int = 0,
+    val flowCount: Int = 0,
     val isCompleted: Boolean = false,
     val isFailed: Boolean = false,
-    val isMistakeShake: Boolean = false
+    val isMistakeShake: Boolean = false,
+    val inspectedArrowId: Int? = null,
+    val score: Int = 0,
+    val elapsedSeconds: Int = 0,
+    val hintCooldown: Int = 0,
+    val comboMultiplier: Int = 1,
+    val lastEscapeTimestamp: Long = 0L,
+    val activeComboMessage: String? = null
 ) {
+    val flowState: Int get() = (flowCount / 3).coerceIn(0, 3)
     val canUndo: Boolean get() = moveHistory.isNotEmpty() && !isCompleted && !isFailed
 }

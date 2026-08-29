@@ -66,4 +66,49 @@ class GameRepository(private val dao: GameDao) {
     suspend fun setPremium(isPremium: Boolean) {
         updateSettings { it.copy(isPremium = isPremium) }
     }
+
+    suspend fun unlockSkin(skinId: String, cost: Int): Boolean {
+        val current = dao.getUserSettingsDirect() ?: UserSettingsEntity()
+        val unlockedList = current.unlockedSkins.split(",").toMutableSet()
+        if (unlockedList.contains(skinId)) return true
+        if (current.totalStars >= cost) {
+            unlockedList.add(skinId)
+            dao.saveUserSettings(
+                current.copy(
+                    totalStars = current.totalStars - cost,
+                    unlockedSkins = unlockedList.joinToString(","),
+                    selectedSkin = skinId
+                )
+            )
+            return true
+        }
+        return false
+    }
+
+    suspend fun selectSkin(skinId: String) {
+        val current = dao.getUserSettingsDirect() ?: UserSettingsEntity()
+        val unlockedList = current.unlockedSkins.split(",")
+        if (unlockedList.contains(skinId)) {
+            dao.saveUserSettings(current.copy(selectedSkin = skinId))
+        }
+    }
+
+    suspend fun checkDailyStreak() {
+        val current = dao.getUserSettingsDirect() ?: UserSettingsEntity()
+        val today = java.time.LocalDate.now().toString()
+        if (current.lastDailyCompletedDate == today) return
+
+        val yesterday = java.time.LocalDate.now().minusDays(1).toString()
+        val newStreak = if (current.lastDailyCompletedDate == yesterday) current.dailyStreak + 1 else 1
+        val bonusHints = if (newStreak % 3 == 0) 3 else 1
+
+        dao.saveUserSettings(
+            current.copy(
+                dailyStreak = newStreak,
+                lastDailyCompletedDate = today,
+                hintsCount = current.hintsCount + bonusHints,
+                totalStars = current.totalStars + 5
+            )
+        )
+    }
 }

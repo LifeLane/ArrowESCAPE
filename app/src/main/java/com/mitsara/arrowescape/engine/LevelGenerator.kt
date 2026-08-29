@@ -9,6 +9,10 @@ import kotlin.random.Random
 
 object LevelGenerator {
 
+    enum class BoardShape {
+        SQUARE, CROSS, DIAMOND, DONUT, PLUS
+    }
+
     /**
      * Generates a deterministic puzzle level for any level number (1..500+).
      */
@@ -16,20 +20,57 @@ object LevelGenerator {
         val seed = levelNumber * 10007L + 8831L
         val random = Random(seed)
 
-        val (gridSize, arrowCount, difficulty, multiCellProb) = when {
-            levelNumber <= 10 -> LevelConfig(4, 4 + (levelNumber / 3), Difficulty.EASY, 0.0f)
-            levelNumber <= 25 -> LevelConfig(4, 5 + (levelNumber - 10) / 4, Difficulty.EASY, 0.1f)
-            levelNumber <= 50 -> LevelConfig(5, 7 + (levelNumber - 25) / 5, Difficulty.EASY, 0.15f)
-            levelNumber <= 100 -> LevelConfig(5, 9 + (levelNumber - 50) / 8, Difficulty.NORMAL, 0.20f)
-            levelNumber <= 150 -> LevelConfig(6, 12 + (levelNumber - 100) / 10, Difficulty.NORMAL, 0.25f)
-            levelNumber <= 225 -> LevelConfig(6, 15 + (levelNumber - 150) / 10, Difficulty.HARD, 0.30f)
-            levelNumber <= 300 -> LevelConfig(7, 18 + (levelNumber - 225) / 12, Difficulty.HARD, 0.35f)
-            levelNumber <= 400 -> LevelConfig(7, 22 + (levelNumber - 300) / 12, Difficulty.EXPERT, 0.40f)
-            else -> LevelConfig(8, 25 + minOf((levelNumber - 400) / 10, 8), Difficulty.EXPERT, 0.45f)
+        val isMilestone = levelNumber % 10 == 0
+        val baseConfig = when {
+            levelNumber <= 10 -> LevelConfig(6, 8 + levelNumber / 2, Difficulty.EASY, 0.1f, BoardShape.SQUARE)
+            levelNumber <= 25 -> LevelConfig(7, 12 + (levelNumber - 10) / 2, Difficulty.EASY, 0.15f, BoardShape.CROSS)
+            levelNumber <= 50 -> LevelConfig(8, 16 + (levelNumber - 25) / 3, Difficulty.NORMAL, 0.20f, BoardShape.DIAMOND)
+            levelNumber <= 100 -> LevelConfig(9, 22 + (levelNumber - 50) / 4, Difficulty.NORMAL, 0.25f, BoardShape.values()[random.nextInt(5)])
+            levelNumber <= 200 -> LevelConfig(10, 28 + (levelNumber - 100) / 5, Difficulty.HARD, 0.30f, BoardShape.values()[random.nextInt(5)])
+            levelNumber <= 350 -> LevelConfig(11, 35 + (levelNumber - 200) / 6, Difficulty.HARD, 0.35f, BoardShape.values()[random.nextInt(5)])
+            else -> LevelConfig(12, 42 + minOf((levelNumber - 350) / 8, 12), Difficulty.EXPERT, 0.40f, BoardShape.values()[random.nextInt(5)])
         }
+
+        val milestoneShapes = listOf(BoardShape.CROSS, BoardShape.DIAMOND, BoardShape.DONUT, BoardShape.PLUS)
+        val shape = if (isMilestone) milestoneShapes[((levelNumber / 10) - 1) % milestoneShapes.size] else baseConfig.shape
+        val gridSize = if (isMilestone) maxOf(baseConfig.gridSize, 8) else baseConfig.gridSize
+        val arrowCount = if (isMilestone) baseConfig.arrowCount + 5 else baseConfig.arrowCount
+        val difficulty = if (isMilestone) Difficulty.EXPERT else baseConfig.difficulty
+        val multiCellProb = baseConfig.multiCellProb
 
         var level: PuzzleLevel? = null
         var attempts = 0
+
+        val mask = generateMask(gridSize, shape)
+
+        val validCells = mutableSetOf<GridPoint>()
+        for (x in 0 until gridSize) {
+            for (y in 0 until gridSize) {
+                if (mask[x][y]) {
+                    validCells.add(GridPoint(x, y))
+                }
+            }
+        }
+
+        val obstacles = mutableSetOf<GridPoint>()
+        val baseObstacleCount = when {
+            levelNumber <= 10 -> 1
+            levelNumber <= 25 -> 2
+            levelNumber <= 50 -> 3
+            levelNumber <= 100 -> 4
+            levelNumber <= 200 -> 6
+            levelNumber <= 350 -> 8
+            else -> 10
+        }
+        val obstacleCount = baseObstacleCount + if (isMilestone) 4 else 0
+        val candidateObstacleCells = validCells.filter { it.x in 1 until gridSize - 1 && it.y in 1 until gridSize - 1 }.shuffled(random)
+        for (cell in candidateObstacleCells) {
+            if (obstacles.size < obstacleCount) {
+                obstacles.add(cell)
+            }
+        }
+
+        val levelTitle = if (isMilestone) "Milestone Lv $levelNumber" else "Level $levelNumber"
 
         while (level == null && attempts < 40) {
             attempts++
@@ -37,18 +78,22 @@ object LevelGenerator {
                 gridSize = gridSize,
                 targetCount = arrowCount,
                 multiCellProb = multiCellProb,
+                mask = mask,
+                obstacles = obstacles,
                 random = Random(seed + attempts * 997L)
             )
 
             val candidate = PuzzleLevel(
                 id = levelNumber,
-                title = "Level $levelNumber",
+                title = levelTitle,
                 difficulty = difficulty,
                 gridWidth = gridSize,
                 gridHeight = gridSize,
                 arrows = generatedArrows,
                 startingLives = 3,
-                maxHints = 3
+                maxHints = 3,
+                validCells = validCells,
+                obstacles = obstacles
             )
 
             if (PuzzleSolver.isSolvable(candidate)) {
@@ -56,30 +101,81 @@ object LevelGenerator {
             }
         }
 
-        return level ?: createFallbackLevel(levelNumber, gridSize, difficulty)
+        return level ?: createFallbackLevel(levelNumber, gridSize, difficulty, obstacles)
     }
 
     private data class LevelConfig(
         val gridSize: Int,
         val arrowCount: Int,
         val difficulty: Difficulty,
-        val multiCellProb: Float
+        val multiCellProb: Float,
+        val shape: BoardShape
     )
 
-    /**
-     * Mathematical Reverse Construction:
-     * Places arrows sequentially such that each newly placed arrow A_new has a clear exit ray
-     * relative to all existing arrows {A_1 ... A_new-1}.
-     * This guarantees that A_new can escape first, unblocking older arrows, forming a 100% solvable puzzle.
-     */
+    private fun generateMask(size: Int, shape: BoardShape): Array<BooleanArray> {
+        val mask = Array(size) { BooleanArray(size) { true } }
+        val center = size / 2
+        when (shape) {
+            BoardShape.SQUARE -> {}
+            BoardShape.CROSS -> {
+                val cut = size / 3
+                for (x in 0 until size) {
+                    for (y in 0 until size) {
+                        if ((x < cut || x >= size - cut) && (y < cut || y >= size - cut)) {
+                            mask[x][y] = false
+                        }
+                    }
+                }
+            }
+            BoardShape.DIAMOND -> {
+                for (x in 0 until size) {
+                    for (y in 0 until size) {
+                        if (Math.abs(x - center) + Math.abs(y - center) > center + 1) {
+                            mask[x][y] = false
+                        }
+                    }
+                }
+            }
+            BoardShape.DONUT -> {
+                val holeRadius = size / 4
+                for (x in 0 until size) {
+                    for (y in 0 until size) {
+                        if (Math.abs(x - center) <= holeRadius && Math.abs(y - center) <= holeRadius) {
+                            mask[x][y] = false
+                        }
+                    }
+                }
+            }
+            BoardShape.PLUS -> {
+                val thick = size / 5
+                for (x in 0 until size) {
+                    for (y in 0 until size) {
+                        if (Math.abs(x - center) > thick && Math.abs(y - center) > thick) {
+                            mask[x][y] = false
+                        }
+                    }
+                }
+            }
+        }
+        return mask
+    }
+
+    private val paletteHex = listOf(
+        "#3B82F6", "#F97316", "#10B981", "#8B5CF6", "#EC4899",
+        "#F59E0B", "#06B6D4", "#6366F1", "#14B8A6", "#EF4444"
+    )
+
     private fun generateGuaranteedReverseConstruction(
         gridSize: Int,
         targetCount: Int,
         multiCellProb: Float,
+        mask: Array<BooleanArray>,
+        obstacles: Set<GridPoint>,
         random: Random
     ): List<Arrow> {
         val arrows = mutableListOf<Arrow>()
         val occupied = HashSet<GridPoint>()
+        occupied.addAll(obstacles)
 
         var currentId = 1
         val directions = Direction.entries.toTypedArray()
@@ -101,25 +197,25 @@ object LevelGenerator {
                     startX = startX,
                     startY = startY,
                     length = length,
-                    direction = dir
+                    direction = dir,
+                    customColorHex = paletteHex[(currentId - 1) % paletteHex.size]
                 )
 
                 val bodyCells = cand.getOccupiedCells()
 
-                // Rule 1: All body cells must be inside grid
-                val inBounds = bodyCells.all { it.x in 0 until gridSize && it.y in 0 until gridSize }
+                // Rule 1: All body cells must be inside grid, inside mask, and not on obstacles
+                val inBounds = bodyCells.all { it.x in 0 until gridSize && it.y in 0 until gridSize && mask[it.x][it.y] && !obstacles.contains(it) }
                 if (!inBounds) continue
 
-                // Rule 2: Body cells must not overlap any already placed arrow bodies
+                // Rule 2: Body cells must not overlap any already placed arrow bodies or obstacles
                 val overlaps = bodyCells.any { occupied.contains(it) }
                 if (overlaps) continue
 
-                // Rule 3: Exit ray of cand must NOT hit any body cell of existing arrows
+                // Rule 3: Exit ray of cand must NOT hit any body cell of existing arrows or obstacles
                 val exitRay = cand.getExitRay(gridSize, gridSize)
                 val exitRayBlockedByExisting = exitRay.any { occupied.contains(it) }
                 if (exitRayBlockedByExisting) continue
 
-                // Calculate how many existing arrows' exit rays this candidate blocks (creates fun dependencies!)
                 var blockingScore = 0
                 for (existing in arrows) {
                     val ray = existing.getExitRay(gridSize, gridSize)
@@ -131,7 +227,7 @@ object LevelGenerator {
                 if (blockingScore > maxBlockingScore) {
                     maxBlockingScore = blockingScore
                     bestCandidate = cand
-                    if (blockingScore > 0) break // Prioritize interlocking arrows
+                    if (blockingScore > 0) break
                 }
             }
 
@@ -142,7 +238,6 @@ object LevelGenerator {
                 placed = true
             }
 
-            // If space is too tight to place more arrows without violating exit ray rules, break early
             if (!placed) break
         }
 
@@ -152,26 +247,37 @@ object LevelGenerator {
     private fun createFallbackLevel(
         levelNumber: Int,
         gridSize: Int,
-        difficulty: Difficulty
+        difficulty: Difficulty,
+        obstacles: Set<GridPoint>
     ): PuzzleLevel {
+        val isMilestone = levelNumber % 10 == 0
+        val levelTitle = if (isMilestone) "Milestone Lv $levelNumber" else "Level $levelNumber"
         val arrows = mutableListOf<Arrow>()
         var id = 1
 
-        // Simple outward edge ring guaranteed solvable layout for grid of size `gridSize`
         for (i in 0 until gridSize) {
-            arrows.add(Arrow(id++, startX = i, startY = 0, length = 1, direction = Direction.UP))
-            arrows.add(Arrow(id++, startX = i, startY = gridSize - 1, length = 1, direction = Direction.DOWN))
+            val p1 = GridPoint(i, 0)
+            val p2 = GridPoint(i, gridSize - 1)
+            if (!obstacles.contains(p1)) {
+                val arrowId = id++
+                arrows.add(Arrow(arrowId, startX = i, startY = 0, length = 1, direction = Direction.UP, customColorHex = paletteHex[(arrowId - 1) % paletteHex.size]))
+            }
+            if (!obstacles.contains(p2)) {
+                val arrowId = id++
+                arrows.add(Arrow(arrowId, startX = i, startY = gridSize - 1, length = 1, direction = Direction.DOWN, customColorHex = paletteHex[(arrowId - 1) % paletteHex.size]))
+            }
         }
 
         return PuzzleLevel(
             id = levelNumber,
-            title = "Level $levelNumber",
+            title = levelTitle,
             difficulty = difficulty,
             gridWidth = gridSize,
             gridHeight = gridSize,
             arrows = arrows,
             startingLives = 3,
-            maxHints = 3
+            maxHints = 3,
+            obstacles = obstacles
         )
     }
 }

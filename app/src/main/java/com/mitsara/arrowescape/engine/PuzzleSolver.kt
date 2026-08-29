@@ -11,13 +11,14 @@ import kotlin.random.Random
 object PuzzleSolver {
 
     /**
-     * Checks if a given arrow can escape without colliding with any remaining active arrows.
+     * Checks if a given arrow can escape without colliding with any remaining active arrows or obstacles.
      */
     fun isArrowUnobstructed(
         arrow: Arrow,
         activeArrows: List<Arrow>,
         gridWidth: Int,
-        gridHeight: Int
+        gridHeight: Int,
+        obstacles: Set<GridPoint> = emptySet()
     ): Boolean {
         val occupiedCells = HashSet<GridPoint>()
         for (other in activeArrows) {
@@ -25,6 +26,7 @@ object PuzzleSolver {
                 occupiedCells.addAll(other.getOccupiedCells())
             }
         }
+        occupiedCells.addAll(obstacles)
 
         val ray = arrow.getExitRay(gridWidth, gridHeight)
         for (point in ray) {
@@ -41,21 +43,20 @@ object PuzzleSolver {
     fun getUnobstructedArrows(
         activeArrows: List<Arrow>,
         gridWidth: Int,
-        gridHeight: Int
+        gridHeight: Int,
+        obstacles: Set<GridPoint> = emptySet()
     ): List<Arrow> {
-        return activeArrows.filter { isArrowUnobstructed(it, activeArrows, gridWidth, gridHeight) }
+        return activeArrows.filter { isArrowUnobstructed(it, activeArrows, gridWidth, gridHeight, obstacles) }
     }
 
     /**
      * Solves the puzzle using monotonic greedy elimination.
-     * In Arrow Escape, removing an unobstructed arrow monotonically reduces board obstacles,
-     * so greedily escaping any unobstructed arrow always leads to puzzle completion if solvable.
-     * Returns the sequence of Arrow IDs to escape, or empty list if unsolvable.
      */
     fun solvePuzzle(
         initialArrows: List<Arrow>,
         gridWidth: Int,
-        gridHeight: Int
+        gridHeight: Int,
+        obstacles: Set<GridPoint> = emptySet()
     ): List<Int> {
         if (initialArrows.isEmpty()) return emptyList()
 
@@ -63,8 +64,8 @@ object PuzzleSolver {
         val path = mutableListOf<Int>()
 
         while (remaining.isNotEmpty()) {
-            val free = getUnobstructedArrows(remaining, gridWidth, gridHeight).firstOrNull()
-                ?: return emptyList() // Deadlock detected: remaining arrows block each other in a cycle!
+            val free = getUnobstructedArrows(remaining, gridWidth, gridHeight, obstacles).firstOrNull()
+                ?: return emptyList()
 
             remaining.remove(free)
             path.add(free.id)
@@ -77,7 +78,7 @@ object PuzzleSolver {
      * Validates whether a puzzle level is 100% solvable.
      */
     fun isSolvable(level: PuzzleLevel): Boolean {
-        return solvePuzzle(level.arrows, level.gridWidth, level.gridHeight).isNotEmpty()
+        return solvePuzzle(level.arrows, level.gridWidth, level.gridHeight, level.obstacles).isNotEmpty()
     }
 
     /**
@@ -86,15 +87,15 @@ object PuzzleSolver {
     fun getHintArrowId(
         activeArrows: List<Arrow>,
         gridWidth: Int,
-        gridHeight: Int
+        gridHeight: Int,
+        obstacles: Set<GridPoint> = emptySet()
     ): Int? {
-        val freeArrows = getUnobstructedArrows(activeArrows, gridWidth, gridHeight)
+        val freeArrows = getUnobstructedArrows(activeArrows, gridWidth, gridHeight, obstacles)
         if (freeArrows.isEmpty()) return null
 
-        // Test each free arrow to see if it leads to a full solution
         for (free in freeArrows) {
             val remaining = activeArrows.filter { it.id != free.id }
-            if (remaining.isEmpty() || solvePuzzle(remaining, gridWidth, gridHeight).isNotEmpty()) {
+            if (remaining.isEmpty() || solvePuzzle(remaining, gridWidth, gridHeight, obstacles).isNotEmpty()) {
                 return free.id
             }
         }

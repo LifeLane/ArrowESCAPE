@@ -61,6 +61,7 @@ fun MainMenuScreen(
     onLevelSelectClick: () -> Unit,
     onDailyChallengeClick: () -> Unit,
     onStatsClick: () -> Unit,
+    onStoreClick: () -> Unit,
     onPremiumClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onAboutClick: () -> Unit
@@ -241,6 +242,24 @@ fun MainMenuScreen(
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = "STATISTICS & PROFILE",
+                        style = MaterialTheme.typography.titleLarge.copy(fontSize = 14.sp, fontWeight = FontWeight.SemiBold),
+                        color = TextPrimary
+                    )
+                }
+
+                // Cosmetic Store Button
+                OutlinedButton(
+                    onClick = onStoreClick,
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                        .testTag("store_button")
+                ) {
+                    Icon(imageVector = Icons.Default.Star, contentDescription = null, tint = GoldStar)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = "COSMETIC STORE",
                         style = MaterialTheme.typography.titleLarge.copy(fontSize = 14.sp, fontWeight = FontWeight.SemiBold),
                         color = TextPrimary
                     )

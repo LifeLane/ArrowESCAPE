@@ -35,6 +35,7 @@ class SoundManager(private val context: Context) {
         scope.launch {
             playTone(frequency = 587.33, durationMs = 40, attack = 0.05, decay = 0.95) // D5 click
         }
+        vibrate(durationMs = 12, strength = 40)
     }
 
     fun playEscapeSound() {

@@ -19,7 +19,7 @@ import com.mitsara.arrowescape.monetization.AdsManager
 import com.mitsara.arrowescape.monetization.SubscriptionManager
 import kotlinx.coroutines.launch
 import com.mitsara.arrowescape.ui.screens.AboutPrivacyScreen
-
+import com.mitsara.arrowescape.ui.screens.CosmeticStoreScreen
 import com.mitsara.arrowescape.ui.screens.DailyChallengeScreen
 import com.mitsara.arrowescape.ui.screens.GameplayScreen
 import com.mitsara.arrowescape.ui.screens.LevelSelectScreen
@@ -38,6 +38,7 @@ sealed class Screen {
     data class Gameplay(val levelId: Int) : Screen()
     object DailyChallenge : Screen()
     object Statistics : Screen()
+    object Store : Screen()
     object Premium : Screen()
     object Settings : Screen()
     object AboutPrivacy : Screen()
@@ -92,9 +93,16 @@ fun ArrowEscapeApp(viewModel: GameViewModel) {
                 onLevelSelectClick = { currentScreen = Screen.LevelSelect },
                 onDailyChallengeClick = { currentScreen = Screen.DailyChallenge },
                 onStatsClick = { currentScreen = Screen.Statistics },
+                onStoreClick = { currentScreen = Screen.Store },
                 onPremiumClick = { currentScreen = Screen.Premium },
                 onSettingsClick = { currentScreen = Screen.Settings },
                 onAboutClick = { currentScreen = Screen.AboutPrivacy }
+            )
+        }
+        is Screen.Store -> {
+            CosmeticStoreScreen(
+                viewModel = viewModel,
+                onBackClick = { currentScreen = Screen.MainMenu }
             )
         }
         is Screen.Statistics -> {

@@ -24,5 +24,7 @@ data class UserSettingsEntity(
     val totalStars: Int = 0,
     val dailyStreak: Int = 1,
     val lastDailyCompletedDate: String = "",
-    val selectedTheme: String = "LIGHT"
+    val selectedTheme: String = "LIGHT",
+    val unlockedSkins: String = "CLASSIC",
+    val selectedSkin: String = "CLASSIC"
 )
