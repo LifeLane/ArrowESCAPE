@@ -25,19 +25,16 @@ import com.mitsara.arrowescape.model.PuzzleLevel
 @Composable
 fun DifficultyMeter(level: PuzzleLevel, modifier: Modifier = Modifier) {
     val difficultyScore = when (level.difficulty) {
-        Difficulty.EASY -> 1
-        Difficulty.NORMAL -> 2
-        Difficulty.HARD -> 3
-        Difficulty.EXPERT -> 4
+        Difficulty.HARD -> 1
+        Difficulty.HARDER -> 2
+        Difficulty.HARDCORE -> 3
     }
     val obstacleDensity = level.obstacles.size
-    val totalElements = level.arrows.size + obstacleDensity
 
     val difficultyColor = when (level.difficulty) {
-        Difficulty.EASY -> Color(0xFF10B981)
-        Difficulty.NORMAL -> Color(0xFF3B82F6)
-        Difficulty.HARD -> Color(0xFF8B5CF6)
-        Difficulty.EXPERT -> Color(0xFFF59E0B)
+        Difficulty.HARD -> Color(0xFF3B82F6)    // Electric Blue
+        Difficulty.HARDER -> Color(0xFFF59E0B)  // Vivid Amber
+        Difficulty.HARDCORE -> Color(0xFFEF4444)// Crimson Red
     }
 
     Column(
@@ -53,7 +50,7 @@ fun DifficultyMeter(level: PuzzleLevel, modifier: Modifier = Modifier) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Complexity: ${level.difficulty.name}",
+                text = "Complexity: ${level.difficulty.displayName}",
                 style = MaterialTheme.typography.bodyMedium.copy(
                     fontWeight = FontWeight.Bold,
                     color = difficultyColor
@@ -76,7 +73,7 @@ fun DifficultyMeter(level: PuzzleLevel, modifier: Modifier = Modifier) {
                 .clip(RoundedCornerShape(3.dp))
                 .background(Color.White.copy(alpha = 0.15f))
         ) {
-            val fraction = (difficultyScore / 4f).coerceIn(0.1f, 1f)
+            val fraction = (difficultyScore / 3f).coerceIn(0.2f, 1f)
             Box(
                 modifier = Modifier
                     .fillMaxWidth(fraction)

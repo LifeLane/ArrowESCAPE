@@ -19,11 +19,10 @@ enum class Direction(val dx: Int, val dy: Int, val rotationDegrees: Float) {
 @Immutable
 data class GridPoint(val x: Int, val y: Int)
 
-enum class Difficulty(val displayName: String) {
-    EASY("Easy"),
-    NORMAL("Normal"),
-    HARD("Hard"),
-    EXPERT("Expert")
+enum class Difficulty(val displayName: String, val levelTier: Int) {
+    HARD("Hard", 1),
+    HARDER("Harder", 2),
+    HARDCORE("Hardcore", 3)
 }
 
 @Immutable
@@ -107,7 +106,9 @@ data class PuzzleLevel(
     val startingLives: Int = 3,
     val maxHints: Int = 3,
     val validCells: Set<GridPoint>? = null,
-    val obstacles: Set<GridPoint> = emptySet()
+    val obstacles: Set<GridPoint> = emptySet(),
+    val dependencyDepth: Int = 0,
+    val difficultyScore: Int = 0
 )
 
 @Immutable
