@@ -66,7 +66,7 @@ val GamePhases = listOf(
     GamePhase(7, "Gravity Core", "Gravitational Singularity", 301, 350, Color(0xFF6366F1), Color(0xFF4338CA)),
     GamePhase(8, "Laser Grid", "Security Defense Matrix", 351, 400, Color(0xFFEF4444), Color(0xFF991B1B)),
     GamePhase(9, "Void Escape", "Dark Dimensional Void", 401, 450, Color(0xFF9333EA), Color(0xFF581C87)),
-    GamePhase(10, "Infinity Core", "Master-Tier Singularity Finale", 451, 500, Color(0xFFFFB800), Color(0xFFC2410C))
+    GamePhase(10, "Infinity Core", "Master Singularity Finale", 451, 500, Color(0xFFFFB800), Color(0xFFC2410C))
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -93,7 +93,7 @@ fun PhaseRoadmapScreen(
         levelProgressMap.values.sumOf { it.stars }
     }
 
-    // Determine the overall next playable level across the game
+    // Determine the overall active next playable level
     val activePlayableLevel = remember(currentLevelId, completedLevels) {
         val maxUnlocked = maxOf(currentLevelId, (completedLevels.maxOrNull() ?: 1))
         maxUnlocked
@@ -102,9 +102,9 @@ fun PhaseRoadmapScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF070913))
+            .background(Color(0xFF060913))
     ) {
-        // Dynamic Stage Environment Canvas in the background
+        // Dynamic Stage Environmental Background Canvas
         AnimatedContent(
             targetState = currentPhase.phaseNumber,
             transitionSpec = {
@@ -140,7 +140,7 @@ fun PhaseRoadmapScreen(
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
                                     Text(
-                                        text = if (isPhaseDetailOpened) "LVL ${currentPhase.startLevel}-${currentPhase.endLevel}" else "10 PHASES",
+                                        text = if (isPhaseDetailOpened) "LVL ${currentPhase.startLevel}–${currentPhase.endLevel}" else "10 PHASES • 500 LVLS",
                                         style = MaterialTheme.typography.labelSmall.copy(
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 9.sp
@@ -151,7 +151,7 @@ fun PhaseRoadmapScreen(
                                 }
                             }
                             Text(
-                                text = currentPhase.title,
+                                text = currentPhase.title + if (!isPhaseDetailOpened) " (Tap phase to open)" else "",
                                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                                 color = profile.accentGlow
                             )
@@ -211,28 +211,24 @@ fun PhaseRoadmapScreen(
                             }
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF070913).copy(alpha = 0.85f))
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF070913).copy(alpha = 0.9f))
                 )
             },
             bottomBar = {
-                // =========================================================================
-                // BOTTOM BAR:
-                // 1. In Matrix Mode -> Active Level CTA (e.g. "PLAY LEVEL X")
-                // 2. In Phase Detail Mode -> Next / Back Buttons + Slider to slide phases!
-                // =========================================================================
+                // Dynamic Bottom Bar
                 Surface(
-                    shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-                    color = Color(0xFF0B101D).copy(alpha = 0.95f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1E293B)),
-                    shadowElevation = 16.dp,
+                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                    color = Color(0xFF0B101D).copy(alpha = 0.97f),
+                    border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF1E293B)),
+                    shadowElevation = 20.dp,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     if (!isPhaseDetailOpened) {
-                        // Matrix Mode: Active Level CTA at the bottom
+                        // 1. Matrix Overview Mode: CTA button for active level
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Button(
@@ -244,14 +240,14 @@ fun PhaseRoadmapScreen(
                                 contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(48.dp)
+                                    .height(50.dp)
                                     .testTag("active_level_cta")
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.PlayArrow,
                                     contentDescription = null,
                                     tint = Color.Black,
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(22.dp)
                                 )
                                 Spacer(Modifier.width(8.dp))
                                 Text(
@@ -264,41 +260,48 @@ fun PhaseRoadmapScreen(
                             }
                         }
                     } else {
-                        // Opened Phase Mode: Back & Next buttons with Slider between them!
+                        // 2. Opened Phase Mode: Back & Next buttons with Interactive Slider between them
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                                .padding(horizontal = 14.dp, vertical = 8.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            // Phase Slider Indicator Label
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text(
+                                        text = "PHASE ${currentPhase.phaseNumber}",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = profile.accentGlow
+                                    )
+                                    Text(
+                                        text = "• ${currentPhase.title}",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
                                 Text(
-                                    text = "PHASE ${currentPhase.phaseNumber} / 10",
+                                    text = "Lvl ${currentPhase.startLevel}-${currentPhase.endLevel}",
                                     fontSize = 11.sp,
-                                    fontWeight = FontWeight.Black,
-                                    color = profile.accentGlow
-                                )
-                                Text(
-                                    text = currentPhase.title,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFFCBD5E1)
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFF94A3B8)
                                 )
                             }
 
-                            Spacer(Modifier.height(4.dp))
+                            Spacer(Modifier.height(2.dp))
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                // BACK BUTTON (Previous Phase)
+                                // PREV PHASE BUTTON (<)
                                 IconButton(
                                     onClick = {
                                         if (selectedPhaseIndex > 0) {
@@ -307,21 +310,26 @@ fun PhaseRoadmapScreen(
                                     },
                                     enabled = selectedPhaseIndex > 0,
                                     modifier = Modifier
-                                        .size(36.dp)
+                                        .size(38.dp)
                                         .clip(CircleShape)
                                         .background(
-                                            if (selectedPhaseIndex > 0) Color(0xFF1E293B) else Color(0xFF0F172A)
+                                            if (selectedPhaseIndex > 0) profile.primaryColor.copy(alpha = 0.3f) else Color(0xFF0F172A)
+                                        )
+                                        .border(
+                                            1.dp,
+                                            if (selectedPhaseIndex > 0) profile.accentGlow.copy(alpha = 0.5f) else Color(0xFF1E293B),
+                                            CircleShape
                                         )
                                 ) {
                                     Icon(
                                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                         contentDescription = "Previous Phase",
                                         tint = if (selectedPhaseIndex > 0) Color.White else Color(0xFF475569),
-                                        modifier = Modifier.size(18.dp)
+                                        modifier = Modifier.size(20.dp)
                                     )
                                 }
 
-                                // SLIDER TO SLIDE BETWEEN PHASES
+                                // SLIDER TO SLIDE PHASES 1 TO 10
                                 Slider(
                                     value = selectedPhaseIndex.toFloat(),
                                     onValueChange = { newVal ->
@@ -341,7 +349,7 @@ fun PhaseRoadmapScreen(
                                         .testTag("phase_slider")
                                 )
 
-                                // NEXT BUTTON (Next Phase)
+                                // NEXT PHASE BUTTON (>)
                                 IconButton(
                                     onClick = {
                                         if (selectedPhaseIndex < 9) {
@@ -350,17 +358,22 @@ fun PhaseRoadmapScreen(
                                     },
                                     enabled = selectedPhaseIndex < 9,
                                     modifier = Modifier
-                                        .size(36.dp)
+                                        .size(38.dp)
                                         .clip(CircleShape)
                                         .background(
-                                            if (selectedPhaseIndex < 9) Color(0xFF1E293B) else Color(0xFF0F172A)
+                                            if (selectedPhaseIndex < 9) profile.primaryColor.copy(alpha = 0.3f) else Color(0xFF0F172A)
+                                        )
+                                        .border(
+                                            1.dp,
+                                            if (selectedPhaseIndex < 9) profile.accentGlow.copy(alpha = 0.5f) else Color(0xFF1E293B),
+                                            CircleShape
                                         )
                                 ) {
                                     Icon(
                                         imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                                         contentDescription = "Next Phase",
                                         tint = if (selectedPhaseIndex < 9) Color.White else Color(0xFF475569),
-                                        modifier = Modifier.size(18.dp)
+                                        modifier = Modifier.size(20.dp)
                                     )
                                 }
                             }
@@ -377,7 +390,7 @@ fun PhaseRoadmapScreen(
             ) {
                 if (!isPhaseDetailOpened) {
                     // =========================================================================
-                    // 1. ALL 10 PHASES STACKED ON SCREEN IN A 2×3×3×2 COMPACT MATRIX
+                    // 1. ALL 10 PHASES STACKED IN 2×3×3×2 MATRIX VIEW
                     // =========================================================================
                     Column(
                         modifier = Modifier
@@ -539,7 +552,7 @@ fun PhaseRoadmapScreen(
                     }
                 } else {
                     // =========================================================================
-                    // 2. OPENED PHASE: ENTIRE SECTION DISPLAYS ALL 50 LEVELS OF THIS PHASE
+                    // 2. OPENED PHASE: ENTIRE SECTION OF 50 LEVELS WITH SLEEK MATRIX
                     // =========================================================================
                     val phaseLevels = (currentPhase.startLevel..currentPhase.endLevel).toList()
                     val completedInPhase = phaseLevels.count { completedLevels.contains(it) || levelProgressMap[it]?.isCompleted == true }
@@ -550,11 +563,11 @@ fun PhaseRoadmapScreen(
                             .fillMaxSize()
                             .padding(horizontal = 14.dp, vertical = 6.dp)
                     ) {
-                        // Stage Info Card Header
+                        // Stage Overview Header Card
                         Surface(
                             shape = RoundedCornerShape(18.dp),
-                            color = Color(0xFF111827).copy(alpha = 0.9f),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, profile.accentGlow.copy(alpha = 0.4f)),
+                            color = Color(0xFF111827).copy(alpha = 0.92f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, profile.accentGlow.copy(alpha = 0.5f)),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(bottom = 8.dp)
@@ -564,8 +577,16 @@ fun PhaseRoadmapScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Text(profile.iconSymbol, fontSize = 22.sp)
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = profile.primaryColor.copy(alpha = 0.35f),
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Text(profile.iconSymbol, fontSize = 20.sp)
+                                        }
+                                    }
                                     Column {
                                         Text(
                                             text = currentPhase.title,
@@ -584,15 +605,15 @@ fun PhaseRoadmapScreen(
 
                                 Column(horizontalAlignment = Alignment.End) {
                                     Text(
-                                        text = "$completedInPhase/50 Done",
+                                        text = "$completedInPhase/50 Completed",
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp,
+                                        fontSize = 11.sp,
                                         color = profile.accentGlow
                                     )
                                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                                        Icon(Icons.Default.Star, contentDescription = null, tint = GoldStar, modifier = Modifier.size(12.dp))
+                                        Icon(Icons.Default.Star, contentDescription = null, tint = GoldStar, modifier = Modifier.size(13.dp))
                                         Text(
-                                            text = "$starsInPhase",
+                                            text = "$starsInPhase Stars",
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Black,
                                             color = GoldStar
@@ -602,7 +623,7 @@ fun PhaseRoadmapScreen(
                             }
                         }
 
-                        // 50 Levels Grid (Full Screen Level Section)
+                        // 50 Levels Grid with Fluid Sliding Transitions
                         AnimatedContent(
                             targetState = currentPhase.phaseNumber,
                             transitionSpec = {
@@ -680,8 +701,8 @@ private fun PhaseGridCard(
 
     val backgroundBrush = Brush.linearGradient(
         listOf(
-            Color(0xFF131D2E).copy(alpha = 0.9f),
-            Color(0xFF0A0F1D).copy(alpha = 0.9f)
+            Color(0xFF131D2E).copy(alpha = 0.92f),
+            Color(0xFF0A0F1D).copy(alpha = 0.92f)
         )
     )
 
@@ -710,7 +731,7 @@ private fun PhaseGridCard(
                 // Phase Badge
                 Surface(
                     shape = CircleShape,
-                    color = profile.primaryColor.copy(alpha = 0.3f),
+                    color = profile.primaryColor.copy(alpha = 0.35f),
                     modifier = Modifier.size(18.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
