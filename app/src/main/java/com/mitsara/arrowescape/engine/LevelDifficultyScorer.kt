@@ -8,9 +8,18 @@ import kotlin.math.abs
 import kotlin.math.ln
 
 /**
- * Multi-factor Difficulty Evaluation and Quality Gate System.
- * Evaluates spatial complexity, directional diversity, dependency depth,
- * bottleneck density, and branching to ensure every level meets HARD / HARDER / HARDCORE standards.
+ * Multi-Factor Difficulty Scorer and Quality Gate Engine.
+ *
+ * Evaluates:
+ * 1. Grid matrix scale
+ * 2. Total arrow count & spatial packing density
+ * 3. Topological dependency depth & wave count
+ * 4. Branching factor & strategic decoys
+ * 5. 4-Way directional entropy (balanced UP/DOWN/LEFT/RIGHT distribution)
+ * 6. Long-range blocker relationships
+ * 7. Obstacle formation complexity
+ *
+ * Enforces strict HARD, HARDER, and HARDCORE standards.
  */
 object LevelDifficultyScorer {
 
@@ -24,13 +33,14 @@ object LevelDifficultyScorer {
         val initialFreeCount: Int,
         val initialFreeRatio: Float,
         val directionalEntropy: Float,
-        val avgArrowLength: Float,
+        val longRangeBlockerCount: Int,
+        val avgBranchingFactor: Float,
         val passesQualityGate: Boolean,
         val rejectionReason: String? = null
     )
 
     /**
-     * Calculates the multi-factor difficulty score and evaluates against quality criteria.
+     * Evaluates a generated puzzle configuration against multi-factor difficulty criteria.
      */
     fun evaluateLevel(
         gridSize: Int,
@@ -41,7 +51,7 @@ object LevelDifficultyScorer {
         levelNumber: Int,
         analysis: PuzzleSolver.SolveAnalysis
     ): DifficultyReport {
-        if (!analysis.isSolvable) {
+        if (!analysis.isSolvable || analysis.solutionSequence.size != arrows.size) {
             return DifficultyReport(
                 difficulty = targetDifficulty,
                 compositeScore = 0,
@@ -52,9 +62,10 @@ object LevelDifficultyScorer {
                 initialFreeCount = 0,
                 initialFreeRatio = 0f,
                 directionalEntropy = 0f,
-                avgArrowLength = 0f,
+                longRangeBlockerCount = 0,
+                avgBranchingFactor = 0f,
                 passesQualityGate = false,
-                rejectionReason = "Unsolvable puzzle"
+                rejectionReason = "Unsolvable puzzle or incomplete solution sequence"
             )
         }
 
@@ -70,9 +81,8 @@ object LevelDifficultyScorer {
         }
 
         val arrowDensity = if (totalUsableCells > 0) totalOccupiedBodyCells.toFloat() / totalUsableCells else 0f
-        val avgArrowLength = if (arrows.isNotEmpty()) totalOccupiedBodyCells.toFloat() / arrows.size else 1f
 
-        // Directional entropy calculation: sum(-p * ln(p))
+        // Directional entropy: sum(-p * ln(p)) / ln(4)
         var entropy = 0f
         val totalDir = arrows.size.toFloat()
         if (totalDir > 0) {
@@ -83,40 +93,49 @@ object LevelDifficultyScorer {
                 }
             }
         }
-        val maxEntropy = ln(4f).toFloat() // ~1.386
+        val maxEntropy = ln(4f).toFloat()
         val normalizedEntropy = (entropy / maxEntropy).coerceIn(0f, 1f)
+
+        // Count long-range blockers (where an arrow blocks another arrow > 2 cells away)
+        var longRangeBlockers = 0
+        for (i in arrows.indices) {
+            val ray = arrows[i].getExitRay(gridSize, gridSize)
+            for (j in arrows.indices) {
+                if (i != j) {
+                    val otherBody = arrows[j].getOccupiedCells()
+                    for (pt in otherBody) {
+                        val rayIdx = ray.indexOf(pt)
+                        if (rayIdx >= 2) {
+                            longRangeBlockers++
+                        }
+                    }
+                }
+            }
+        }
 
         val initialFreeCount = analysis.initialFreeCount
         val initialFreeRatio = if (arrows.isNotEmpty()) initialFreeCount.toFloat() / arrows.size else 1f
         val dependencyDepth = analysis.dependencyDepth
+        val branching = analysis.avgBranchingFactor
 
-        // Multi-Factor Difficulty Formula
-        // 1. Grid Scale Points: 8 -> 20pts, 15 -> 65pts
-        val gridPoints = (gridSize - 7) * 7.5f
+        // Composite Multi-Factor Score Calculation
+        val gridPoints = (gridSize - 7) * 8f
+        val arrowPoints = arrows.size * 1.5f
+        val depPoints = dependencyDepth * 7f
+        val densityPoints = arrowDensity * 50f
+        val obstaclePoints = obstacles.size * 1.8f
+        val diversityBonus = normalizedEntropy * 25f
+        val longRangeBonus = minOf(30f, longRangeBlockers * 1.2f)
+        val branchingPoints = minOf(20f, branching * 4f)
 
-        // 2. Arrow Count Points: 15 arrows -> 25pts, 50 arrows -> 80pts
-        val arrowPoints = arrows.size * 1.6f
+        val rawScore = (gridPoints + arrowPoints + depPoints + densityPoints + obstaclePoints +
+                diversityBonus + longRangeBonus + branchingPoints).toInt()
 
-        // 3. Dependency Depth Points: 3 waves -> 15pts, 12 waves -> 75pts
-        val depPoints = dependencyDepth * 6.5f
-
-        // 4. Density & Obstacle Points
-        val densityPoints = arrowDensity * 40f
-        val obstaclePoints = obstacles.size * 1.5f
-
-        // 5. Constrained Start Bonus (Fewer initial free arrows = higher challenge)
-        val constraintBonus = ((1f - initialFreeRatio) * 30f).coerceAtLeast(0f)
-
-        // 6. Directional Diversity Bonus
-        val diversityBonus = normalizedEntropy * 20f
-
-        val rawScore = (gridPoints + arrowPoints + depPoints + densityPoints + obstaclePoints + constraintBonus + diversityBonus).toInt()
-
-        // Minimum Standards per Difficulty Tier
+        // Minimum standards per difficulty tier
         val (minDepth, minGrid, minArrows, minScore) = when (targetDifficulty) {
-            Difficulty.HARD -> Tuple4(3, 8, 12, 100)
-            Difficulty.HARDER -> Tuple4(5, 10, 20, 160)
-            Difficulty.HARDCORE -> Tuple4(8, 12, 30, 230)
+            Difficulty.HARD -> Tuple4(3, 8, 16, 95)
+            Difficulty.HARDER -> Tuple4(5, 10, 28, 150)
+            Difficulty.HARDCORE -> Tuple4(8, 12, 45, 220)
         }
 
         var pass = true
@@ -133,10 +152,10 @@ object LevelDifficultyScorer {
             reason = "Dependency depth $dependencyDepth below minimum $minDepth for $targetDifficulty"
         } else if (rawScore < minScore) {
             pass = false
-            reason = "Composite difficulty score $rawScore below minimum $minScore"
-        } else if (initialFreeRatio > 0.55f && arrows.size >= 15) {
+            reason = "Difficulty score $rawScore below minimum $minScore for $targetDifficulty"
+        } else if (initialFreeRatio > 0.60f && arrows.size >= 16) {
             pass = false
-            reason = "Too many obvious first moves (${initialFreeCount}/${arrows.size})"
+            reason = "Too many obvious initial moves ($initialFreeCount / ${arrows.size})"
         }
 
         return DifficultyReport(
@@ -149,7 +168,8 @@ object LevelDifficultyScorer {
             initialFreeCount = initialFreeCount,
             initialFreeRatio = initialFreeRatio,
             directionalEntropy = normalizedEntropy,
-            avgArrowLength = avgArrowLength,
+            longRangeBlockerCount = longRangeBlockers,
+            avgBranchingFactor = branching,
             passesQualityGate = pass,
             rejectionReason = reason
         )

@@ -10,9 +10,14 @@ import kotlin.math.abs
 import kotlin.random.Random
 
 /**
- * High-performance, solvability-first procedural generator for HARD, HARDER, and HARDCORE difficulty tiers.
- * Employs reverse-dependency construction, complex obstacle formations, large grid matrices (8x8 to 15x15),
- * structural fingerprinting, and rigorous quality gates.
+ * High-performance, backward-construction procedural puzzle generator.
+ *
+ * Exclusively generates HARD, HARDER, and HARDCORE difficulty tiers.
+ * Uses reverse dependency synthesis:
+ * - Begins with deeply nested/trapped arrows that exit last.
+ * - Iteratively layers blocking arrows, directional conflicts, long-range blockers,
+ *   and branch nodes whose removal unlocks deeper segments.
+ * - Enforces 100% solvability, strict quality gates, and anti-repetition fingerprinting.
  */
 object LevelGenerator {
 
@@ -30,7 +35,7 @@ object LevelGenerator {
     )
 
     /**
-     * Generates or retrieves a deterministic puzzle level for any level number (1..500+).
+     * Retrieves or generates a deterministic puzzle level for any level number.
      */
     fun getLevel(levelNumber: Int): PuzzleLevel {
         levelCache[levelNumber]?.let { return it }
@@ -46,48 +51,55 @@ object LevelGenerator {
 
         val isMilestone = levelNumber % 10 == 0
 
-        // Determine Difficulty Tier
+        // Strict Difficulty Progression:
+        // Levels 1–50: HARD
+        // Levels 51–150: HARD -> HARDER
+        // Levels 151–300: HARDER
+        // Levels 301–500: HARDER -> HARDCORE
+        // Levels 501+: HARDCORE
         val targetDifficulty = when {
-            levelNumber <= 60 -> if (isMilestone) Difficulty.HARDER else Difficulty.HARD
-            levelNumber <= 180 -> if (isMilestone) Difficulty.HARDCORE else Difficulty.HARDER
+            levelNumber <= 50 -> Difficulty.HARD
+            levelNumber <= 150 -> if (levelNumber > 100 || isMilestone) Difficulty.HARDER else Difficulty.HARD
+            levelNumber <= 300 -> Difficulty.HARDER
+            levelNumber <= 500 -> if (levelNumber > 400 || isMilestone) Difficulty.HARDCORE else Difficulty.HARDER
             else -> Difficulty.HARDCORE
         }
 
-        // Determine Grid Size Progression
+        // Dynamically Expand Grid Matrix Scale (8x8 to 15x15)
         val gridSize = when (targetDifficulty) {
             Difficulty.HARD -> {
                 when {
-                    levelNumber <= 20 -> 8
-                    levelNumber <= 40 -> 9
+                    levelNumber <= 15 -> 8
+                    levelNumber <= 35 -> 9
                     else -> 10
                 }
             }
             Difficulty.HARDER -> {
                 when {
-                    levelNumber <= 100 -> 10
-                    levelNumber <= 140 -> 11
+                    levelNumber <= 120 -> 10
+                    levelNumber <= 220 -> 11
                     else -> 12
                 }
             }
             Difficulty.HARDCORE -> {
                 when {
-                    levelNumber <= 250 -> 12
-                    levelNumber <= 350 -> 13
-                    levelNumber <= 450 -> 14
+                    levelNumber <= 380 -> 12
+                    levelNumber <= 440 -> 13
+                    levelNumber <= 500 -> 14
                     else -> 15
                 }
             }
         }
 
-        // Target Arrow Count
+        // Target Arrow Count Scaling
         val baseArrowCount = when (targetDifficulty) {
-            Difficulty.HARD -> (14 + (levelNumber * 14 / 60)).coerceIn(14, 28)
-            Difficulty.HARDER -> (26 + ((levelNumber - 60) * 18 / 120)).coerceIn(26, 46)
-            Difficulty.HARDCORE -> (40 + ((levelNumber - 180) * 32 / 320)).coerceIn(40, 72)
+            Difficulty.HARD -> (20 + (levelNumber * 18 / 50)).coerceIn(20, 38)
+            Difficulty.HARDER -> (38 + ((levelNumber - 50) * 32 / 250)).coerceIn(38, 70)
+            Difficulty.HARDCORE -> (60 + ((levelNumber - 300) * 45 / 200)).coerceIn(60, 110)
         }
-        val targetArrowCount = if (isMilestone) (baseArrowCount * 1.15f).toInt() else baseArrowCount
+        val targetArrowCount = if (isMilestone) (baseArrowCount * 1.12f).toInt() else baseArrowCount
 
-        // Board Shape & Formations
+        // Board Shape & Geometric Mask
         val shape = if (isMilestone) {
             val milestoneShapes = listOf(BoardShape.CROSS, BoardShape.DIAMOND, BoardShape.DONUT, BoardShape.CORRIDOR_CHAMBER)
             milestoneShapes[((levelNumber / 10) - 1) % milestoneShapes.size]
@@ -104,13 +116,13 @@ object LevelGenerator {
             }
         }
 
-        // Target Obstacle Count & Formations
+        // Procedural Obstacle Formations & Choke Points
         val baseObstacleCount = when (targetDifficulty) {
             Difficulty.HARD -> (gridSize / 2) + random.nextInt(2, 5)
             Difficulty.HARDER -> gridSize + random.nextInt(3, 7)
             Difficulty.HARDCORE -> (gridSize * 1.3f).toInt() + random.nextInt(4, 8)
         }
-        val targetObstacleCount = if (isMilestone) baseObstacleCount + 4 else baseObstacleCount
+        val targetObstacleCount = if (isMilestone) baseObstacleCount + 3 else baseObstacleCount
 
         val formationTypes = ObstacleFormationGenerator.FormationType.entries.toTypedArray()
         val formationType = formationTypes[random.nextInt(formationTypes.size)]
@@ -149,7 +161,7 @@ object LevelGenerator {
                 random = iterationRandom
             )
 
-            if (generatedArrows.size >= 10) {
+            if (generatedArrows.size >= 14) {
                 val candidate = PuzzleLevel(
                     id = levelNumber,
                     title = levelTitle,
@@ -282,8 +294,10 @@ object LevelGenerator {
     }
 
     /**
-     * Synthesizes arrows using controlled reverse-dependency placement.
-     * Starts by placing the last arrows to escape (deeply buried), then adds arrows that block their exit rays.
+     * Backward-construction arrow synthesis:
+     * Starts by placing deep inner arrows (escaped last).
+     * Subsequent arrows are placed so their exit rays are clear, but their bodies strategically block
+     * earlier arrows' escape rays to generate multi-layer dependencies, branching graphs, and long-range blockers.
      */
     private fun generateDependentReverseConstruction(
         gridSize: Int,
@@ -302,14 +316,26 @@ object LevelGenerator {
         val directions = Direction.entries.toTypedArray()
         val maxAttemptsPerArrow = 150
 
+        // Balanced Directional Distribution Tracker (~25% for UP, DOWN, LEFT, RIGHT)
+        val dirUsage = mutableMapOf(
+            Direction.UP to 0,
+            Direction.DOWN to 0,
+            Direction.LEFT to 0,
+            Direction.RIGHT to 0
+        )
+
         while (arrows.size < targetCount) {
             var bestCandidate: Arrow? = null
             var bestScore = -100
 
-            for (tryCount in 0 until maxAttemptsPerArrow) {
-                val dir = directions[random.nextInt(directions.size)]
+            // Prioritize selecting under-represented directions
+            val minUsage = dirUsage.values.minOrNull() ?: 0
+            val preferredDirs = directions.filter { (dirUsage[it] ?: 0) <= minUsage + 2 }.ifEmpty { directions.toList() }
 
-                // Arrow Length distribution: 1 to 4 cells
+            for (tryCount in 0 until maxAttemptsPerArrow) {
+                val dir = preferredDirs[random.nextInt(preferredDirs.size)]
+
+                // Arrow Length: 1 to 4 cells
                 val length = if (random.nextFloat() < multiCellProb && gridSize >= 8) {
                     random.nextInt(2, minOf(gridSize - 2, 5))
                 } else 1
@@ -317,8 +343,8 @@ object LevelGenerator {
                 val startX = random.nextInt(gridSize)
                 val startY = random.nextInt(gridSize)
 
-                // L-Shaped / Bent arrow generation
-                val isBent = random.nextFloat() < 0.40f && multiCellProb > 0.3f && gridSize >= 8
+                // L-Shaped / Bent Arrow Geometry Generation
+                val isBent = random.nextFloat() < 0.35f && multiCellProb > 0.3f && gridSize >= 8
                 val pathPoints = if (isBent) {
                     val turnLen1 = random.nextInt(2, 4)
                     val turnLen2 = random.nextInt(2, 4)
@@ -378,30 +404,37 @@ object LevelGenerator {
                     continue
                 }
 
-                // Check 3: Candidate's exit ray must be strictly free of obstacles, mask boundaries, and already placed arrows
+                // Check 3: Candidate's exit ray must be free to the board perimeter (reverse-solvability guarantee)
                 val exitRay = cand.getExitRay(gridSize, gridSize)
                 if (exitRay.any { occupied.contains(it) || !mask[it.x][it.y] }) {
                     continue
                 }
 
-                // Scoring: We WANT this candidate's body to block as many existing arrows as possible!
-                // This creates deep dependency chains (cand blocks arrow X, which blocks arrow Y...)
+                // Reverse Dependency Scoring: Reward candidates whose body blocks previously placed arrows!
                 var blockedExistingCount = 0
+                var longRangeBlockCount = 0
                 for (existing in arrows) {
                     val exRay = existing.getExitRay(gridSize, gridSize)
-                    if (bodyCells.any { exRay.contains(it) }) {
-                        blockedExistingCount++
+                    for (cell in bodyCells) {
+                        val rayIdx = exRay.indexOf(cell)
+                        if (rayIdx >= 0) {
+                            blockedExistingCount++
+                            if (rayIdx >= 2) {
+                                longRangeBlockCount++
+                            }
+                        }
                     }
                 }
 
-                var score = blockedExistingCount * 30
+                var score = blockedExistingCount * 30 + longRangeBlockCount * 15
 
-                // Opposing direction bonus (creates head-to-head or crossing visual tension)
+                // Opposing Direction Bonus (creates head-to-head tension)
                 val opposingCount = arrows.count { it.direction == dir.opposite() }
-                score += (opposingCount * 3)
+                score += (opposingCount * 4)
 
-                // Length bonus
-                score += (cand.getOccupiedCells().size * 4)
+                // Length & Bent complexity bonus
+                score += (cand.getOccupiedCells().size * 3)
+                if (isBent) score += 8
 
                 if (score > bestScore) {
                     bestScore = score
@@ -413,6 +446,7 @@ object LevelGenerator {
             if (bestCandidate != null) {
                 arrows.add(bestCandidate)
                 occupied.addAll(bestCandidate.getOccupiedCells())
+                dirUsage[bestCandidate.getTipDirection()] = (dirUsage[bestCandidate.getTipDirection()] ?: 0) + 1
                 currentId++
             } else {
                 break
@@ -438,9 +472,8 @@ object LevelGenerator {
         val occupied = HashSet<GridPoint>(obstacles)
         var id = 1
 
-        // Guaranteed progressive reverse generation on valid mask cells
         val directions = Direction.entries.toTypedArray()
-        for (attempt in 0 until (targetCount * 10)) {
+        for (attempt in 0 until (targetCount * 12)) {
             if (arrows.size >= targetCount) break
             val x = random.nextInt(gridSize)
             val y = random.nextInt(gridSize)
@@ -461,7 +494,7 @@ object LevelGenerator {
         val depDepth = when (difficulty) {
             Difficulty.HARD -> 4
             Difficulty.HARDER -> 7
-            Difficulty.HARDCORE -> 10
+            Difficulty.HARDCORE -> 11
         }
 
         return PuzzleLevel(
@@ -476,7 +509,7 @@ object LevelGenerator {
             validCells = validCells,
             obstacles = obstacles,
             dependencyDepth = depDepth,
-            difficultyScore = 130 + levelNumber
+            difficultyScore = 140 + levelNumber
         )
     }
 }
