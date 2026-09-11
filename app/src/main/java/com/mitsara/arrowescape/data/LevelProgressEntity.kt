@@ -39,5 +39,9 @@ data class UserSettingsEntity(
     val selectedBoard: String = "BOARD_PARCHMENT",
     val selectedGrid: String = "GRID_DOT_MATRIX",
     val selectedFrame: String = "FRAME_CLEAN_MINIMAL",
-    val unlockedCosmetics: String = "ARROW_CYBER_NEON,BG_CALM_PARCHMENT,BOARD_PARCHMENT,GRID_DOT_MATRIX,FRAME_CLEAN_MINIMAL"
+    val unlockedCosmetics: String = "ARROW_CYBER_NEON,BG_CALM_PARCHMENT,BOARD_PARCHMENT,GRID_DOT_MATRIX,FRAME_CLEAN_MINIMAL",
+    val chronoHighScore: Int = 0,
+    val zenTotalEscapes: Int = 0,
+    val claimedAchievements: String = "",
+    val customLevelsJson: String = "[]"
 )

@@ -92,6 +92,32 @@ class SoundManager(private val context: Context) {
         vibrate(durationMs = 200, strength = 150)
     }
 
+    fun playPentatonicChime(step: Int = 0) {
+        if (!soundEnabled) return
+        val pentatonicScale = listOf(261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25, 783.99, 880.00)
+        val freq = pentatonicScale[step % pentatonicScale.size]
+        scope.launch {
+            playTone(frequency = freq, durationMs = 85, attack = 0.05, decay = 0.95)
+        }
+        vibrate(durationMs = 15, strength = 45)
+    }
+
+    fun playFrenzySweep() {
+        if (!soundEnabled) return
+        scope.launch {
+            playArpeggio(listOf(440.0, 554.37, 659.25, 880.0, 1108.73, 1318.51), noteDurationMs = 25)
+        }
+        vibrate(durationMs = 60, strength = 180)
+    }
+
+    fun playAchievementClaimSound() {
+        if (!soundEnabled) return
+        scope.launch {
+            playArpeggio(listOf(523.25, 659.25, 783.99, 1046.50, 1567.98), noteDurationMs = 60)
+        }
+        vibrate(durationMs = 150, strength = 220)
+    }
+
     private fun vibrate(durationMs: Long, strength: Int = 128) {
         if (!vibrationEnabled || hapticLevel == "OFF" || vibrator == null || !vibrator!!.hasVibrator()) return
         val adjustedDuration = when (hapticLevel) {

@@ -19,15 +19,20 @@ import com.mitsara.arrowescape.monetization.AdsManager
 import com.mitsara.arrowescape.monetization.SubscriptionManager
 import kotlinx.coroutines.launch
 import com.mitsara.arrowescape.ui.screens.AboutPrivacyScreen
+import com.mitsara.arrowescape.ui.screens.ChronoRushScreen
 import com.mitsara.arrowescape.ui.screens.CosmeticStoreScreen
 import com.mitsara.arrowescape.ui.screens.DailyChallengeScreen
 import com.mitsara.arrowescape.ui.screens.GameplayScreen
-import com.mitsara.arrowescape.ui.screens.PhaseRoadmapScreen
+import com.mitsara.arrowescape.ui.screens.LevelWorkshopScreen
 import com.mitsara.arrowescape.ui.screens.MainMenuScreen
+import com.mitsara.arrowescape.ui.screens.MasteryBadgesScreen
+import com.mitsara.arrowescape.ui.screens.PhaseRoadmapScreen
 import com.mitsara.arrowescape.ui.screens.PremiumScreen
 import com.mitsara.arrowescape.ui.screens.SettingsScreen
+import com.mitsara.arrowescape.ui.screens.SilhouetteExhibitionScreen
 import com.mitsara.arrowescape.ui.screens.SplashScreen
 import com.mitsara.arrowescape.ui.screens.StatisticsScreen
+import com.mitsara.arrowescape.ui.screens.ZenFlowScreen
 import com.mitsara.arrowescape.ui.theme.ArrowEscapeTheme
 import com.mitsara.arrowescape.ui.viewmodel.GameViewModel
 
@@ -37,6 +42,11 @@ sealed class Screen {
     object LevelSelect : Screen()
     data class Gameplay(val levelId: Int) : Screen()
     object EndlessMode : Screen()
+    object ExhibitionHall : Screen()
+    object ZenFlow : Screen()
+    object ChronoRush : Screen()
+    object Workshop : Screen()
+    object Mastery : Screen()
     object DailyChallenge : Screen()
     object Statistics : Screen()
     object Store : Screen()
@@ -94,11 +104,15 @@ fun ArrowEscapeApp(viewModel: GameViewModel) {
                     val nextTheme = if (isGoogly) "RETRO_ARCADE" else "GOOGLY"
                     viewModel.selectTheme(nextTheme)
                 },
-                onEndlessClick = { currentScreen = Screen.EndlessMode },
-
                 onPlayClick = {
                     currentScreen = Screen.Gameplay(userSettings.currentLevelId)
                 },
+                onEndlessClick = { currentScreen = Screen.EndlessMode },
+                onExhibitionClick = { currentScreen = Screen.ExhibitionHall },
+                onZenFlowClick = { currentScreen = Screen.ZenFlow },
+                onChronoRushClick = { currentScreen = Screen.ChronoRush },
+                onWorkshopClick = { currentScreen = Screen.Workshop },
+                onMasteryClick = { currentScreen = Screen.Mastery },
                 onLevelSelectClick = { currentScreen = Screen.LevelSelect },
                 onDailyChallengeClick = { currentScreen = Screen.DailyChallenge },
                 onStatsClick = { currentScreen = Screen.Statistics },
@@ -106,6 +120,45 @@ fun ArrowEscapeApp(viewModel: GameViewModel) {
                 onPremiumClick = { currentScreen = Screen.Premium },
                 onSettingsClick = { currentScreen = Screen.Settings },
                 onAboutClick = { currentScreen = Screen.AboutPrivacy }
+            )
+        }
+        is Screen.ExhibitionHall -> {
+            SilhouetteExhibitionScreen(
+                completedLevels = completedLevels,
+                levelProgressMap = levelProgressMap,
+                onPlayLevel = { levelId ->
+                    currentScreen = Screen.Gameplay(levelId)
+                },
+                onBackClick = { currentScreen = Screen.MainMenu }
+            )
+        }
+        is Screen.ZenFlow -> {
+            ZenFlowScreen(
+                viewModel = viewModel,
+                userSettings = userSettings,
+                onBackClick = { currentScreen = Screen.MainMenu }
+            )
+        }
+        is Screen.ChronoRush -> {
+            ChronoRushScreen(
+                viewModel = viewModel,
+                userSettings = userSettings,
+                onBackClick = { currentScreen = Screen.MainMenu }
+            )
+        }
+        is Screen.Workshop -> {
+            LevelWorkshopScreen(
+                viewModel = viewModel,
+                userSettings = userSettings,
+                onBackClick = { currentScreen = Screen.MainMenu }
+            )
+        }
+        is Screen.Mastery -> {
+            MasteryBadgesScreen(
+                viewModel = viewModel,
+                userSettings = userSettings,
+                completedLevelsCount = completedLevels.size,
+                onBackClick = { currentScreen = Screen.MainMenu }
             )
         }
         is Screen.Store -> {

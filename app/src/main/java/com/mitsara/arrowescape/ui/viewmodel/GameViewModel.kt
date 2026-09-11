@@ -586,4 +586,25 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             repository.setPremium(isPremium)
         }
     }
+
+    fun claimAchievement(achievementId: String, rewardDiamonds: Int) {
+        viewModelScope.launch {
+            val success = repository.claimAchievement(achievementId, rewardDiamonds)
+            if (success) {
+                soundManager.playAchievementClaimSound()
+            }
+        }
+    }
+
+    fun saveChronoResult(score: Int, earnedCoins: Int, earnedDiamonds: Int) {
+        viewModelScope.launch {
+            repository.saveChronoHighScore(score, earnedCoins, earnedDiamonds)
+        }
+    }
+
+    fun addZenEscapes(count: Int) {
+        viewModelScope.launch {
+            repository.addZenEscapes(count)
+        }
+    }
 }

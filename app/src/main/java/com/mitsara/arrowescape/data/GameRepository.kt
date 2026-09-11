@@ -281,4 +281,42 @@ class GameRepository(private val dao: GameDao) {
             )
         )
     }
+
+    suspend fun saveChronoHighScore(score: Int, earnedCoins: Int, earnedDiamonds: Int) {
+        val current = dao.getUserSettingsDirect() ?: UserSettingsEntity()
+        val newHigh = maxOf(current.chronoHighScore, score)
+        dao.saveUserSettings(
+            current.copy(
+                chronoHighScore = newHigh,
+                coins = current.coins + earnedCoins,
+                diamonds = current.diamonds + earnedDiamonds
+            )
+        )
+    }
+
+    suspend fun addZenEscapes(count: Int) {
+        val current = dao.getUserSettingsDirect() ?: UserSettingsEntity()
+        dao.saveUserSettings(
+            current.copy(
+                zenTotalEscapes = current.zenTotalEscapes + count,
+                coins = current.coins + (count * 2)
+            )
+        )
+    }
+
+    suspend fun claimAchievement(achievementId: String, rewardDiamonds: Int): Boolean {
+        val current = dao.getUserSettingsDirect() ?: UserSettingsEntity()
+        val claimedSet = current.claimedAchievements.split(",").filter { it.isNotBlank() }.toMutableSet()
+        if (claimedSet.contains(achievementId)) return false
+
+        claimedSet.add(achievementId)
+        dao.saveUserSettings(
+            current.copy(
+                diamonds = current.diamonds + rewardDiamonds,
+                claimedAchievements = claimedSet.joinToString(",")
+            )
+        )
+        return true
+    }
 }
+

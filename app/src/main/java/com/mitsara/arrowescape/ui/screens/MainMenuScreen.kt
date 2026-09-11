@@ -14,13 +14,18 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.AllInclusive
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.GridOn
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Leaderboard
+import androidx.compose.material.icons.filled.Museum
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.SelfImprovement
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.Star
@@ -59,6 +64,11 @@ fun MainMenuScreen(
     onToggleGooglyTheme: (() -> Unit)? = null,
     onPlayClick: () -> Unit,
     onEndlessClick: () -> Unit,
+    onExhibitionClick: () -> Unit,
+    onZenFlowClick: () -> Unit,
+    onChronoRushClick: () -> Unit,
+    onWorkshopClick: () -> Unit,
+    onMasteryClick: () -> Unit,
     onLevelSelectClick: () -> Unit,
     onDailyChallengeClick: () -> Unit,
     onStatsClick: () -> Unit,
@@ -246,20 +256,44 @@ fun MainMenuScreen(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // Level Roadmap / Selection
-                // Endless Mode
+                // Exhibition Hall (500 Silhouettes)
                 AnimatedMenuCard(
-                    title = "ENDLESS MODE",
-                    subtitle = "Never ending procedural challenge",
-                    icon = Icons.Default.AllInclusive,
-                    iconTint = if (isGooglyMode) Color(0xFF00FFCC) else Color(0xFF8B5CF6),
-                    onClick = onEndlessClick,
+                    title = "EXHIBITION HALL",
+                    subtitle = "500 Handcrafted Silhouette Dioramas",
+                    icon = Icons.Default.Museum,
+                    iconTint = if (isGooglyMode) Color(0xFFFF0055) else Color(0xFFE11D48),
+                    onClick = onExhibitionClick,
                     isGooglyMode = isGooglyMode,
-                    badgeText = "INFINITE",
-                    testTag = "endless_button"
+                    badgeText = "GALLERY",
+                    testTag = "exhibition_button"
                 )
-                AnimatedMenuCard(
 
+                // Chrono Rush Sprint
+                AnimatedMenuCard(
+                    title = "CHRONO RUSH",
+                    subtitle = "60s Time-Attack arcade escape sprint",
+                    icon = Icons.Default.Bolt,
+                    iconTint = if (isGooglyMode) Color(0xFFFFCC00) else Color(0xFFF59E0B),
+                    onClick = onChronoRushClick,
+                    isGooglyMode = isGooglyMode,
+                    badgeText = "SPEEDRUN",
+                    testTag = "chrono_rush_button"
+                )
+
+                // Zen Flow State
+                AnimatedMenuCard(
+                    title = "ZEN FLOW STATE",
+                    subtitle = "Relaxed endless canvas & ambient chimes",
+                    icon = Icons.Default.SelfImprovement,
+                    iconTint = if (isGooglyMode) Color(0xFF00FFCC) else Color(0xFF10B981),
+                    onClick = onZenFlowClick,
+                    isGooglyMode = isGooglyMode,
+                    badgeText = "CALM",
+                    testTag = "zen_flow_button"
+                )
+
+                // Level Roadmap
+                AnimatedMenuCard(
                     title = "LEVEL ROADMAP",
                     subtitle = "10 Worlds • 500 Unique Stages",
                     icon = Icons.Default.GridOn,
@@ -270,16 +304,52 @@ fun MainMenuScreen(
                     testTag = "level_select_button"
                 )
 
+                // Level Workshop & Creator
+                AnimatedMenuCard(
+                    title = "LEVEL WORKSHOP",
+                    subtitle = "Design custom puzzles & test solvability",
+                    icon = Icons.Default.Build,
+                    iconTint = if (isGooglyMode) Color(0xFF9945FF) else Color(0xFF8B5CF6),
+                    onClick = onWorkshopClick,
+                    isGooglyMode = isGooglyMode,
+                    badgeText = "CREATOR",
+                    testTag = "workshop_button"
+                )
+
+                // Mastery & Trophies
+                AnimatedMenuCard(
+                    title = "MASTERY & TROPHIES",
+                    subtitle = "Claim 💎 diamonds for logic achievements",
+                    icon = Icons.Default.EmojiEvents,
+                    iconTint = if (isGooglyMode) Color(0xFFFFD700) else Color(0xFFFACC15),
+                    onClick = onMasteryClick,
+                    isGooglyMode = isGooglyMode,
+                    badgeText = "REWARDS",
+                    testTag = "mastery_button"
+                )
+
                 // Daily Challenge
                 AnimatedMenuCard(
                     title = "DAILY PUZZLE",
                     subtitle = "Daily escape modifier with bonus stars",
                     icon = Icons.Default.DateRange,
-                    iconTint = if (isGooglyMode) Color(0xFFFFB800) else Color(0xFFF59E0B),
+                    iconTint = if (isGooglyMode) Color(0xFFFFB800) else Color(0xFFF97316),
                     onClick = onDailyChallengeClick,
                     isGooglyMode = isGooglyMode,
                     badgeText = "STREAK",
                     testTag = "daily_challenge_button"
+                )
+
+                // Endless Procedural Mode
+                AnimatedMenuCard(
+                    title = "ENDLESS MODE",
+                    subtitle = "Procedural infinite escape challenges",
+                    icon = Icons.Default.AllInclusive,
+                    iconTint = if (isGooglyMode) Color(0xFF00FFCC) else Color(0xFF6366F1),
+                    onClick = onEndlessClick,
+                    isGooglyMode = isGooglyMode,
+                    badgeText = "INFINITE",
+                    testTag = "endless_button"
                 )
 
                 // Statistics & Profile
@@ -287,7 +357,7 @@ fun MainMenuScreen(
                     title = "STATISTICS & PROFILE",
                     subtitle = "Escaped arrows, accuracy & best times",
                     icon = Icons.Default.Leaderboard,
-                    iconTint = if (isGooglyMode) Color(0xFF00FF66) else Color(0xFF10B981),
+                    iconTint = if (isGooglyMode) Color(0xFF00FF66) else Color(0xFF059669),
                     onClick = onStatsClick,
                     isGooglyMode = isGooglyMode,
                     testTag = "stats_button"
