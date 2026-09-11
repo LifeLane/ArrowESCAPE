@@ -177,16 +177,34 @@ fun LevelSelectScreen(
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.Center
                                 ) {
+                                    val levelDef = remember(levelId) { com.mitsara.arrowescape.engine.SilhouetteShapeRegistry.getLevelDef(levelId) }
                                     Text(
                                         text = "$levelId",
-                                        style = MaterialTheme.typography.headlineSmall.copy(
-                                            fontWeight = FontWeight.ExtraBold
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontWeight = FontWeight.ExtraBold,
+                                            fontSize = 16.sp
                                         ),
                                         color = when {
                                             isCurrent -> Color.White
                                             isCompleted -> Color(0xFF00796B)
                                             else -> TextPrimary
                                         }
+                                    )
+                                    Text(
+                                        text = levelDef.name,
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            fontSize = 8.5.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        ),
+                                        color = when {
+                                            isCurrent -> Color.White.copy(alpha = 0.9f)
+                                            isCompleted -> Color(0xFF00796B).copy(alpha = 0.8f)
+                                            else -> TextSecondary
+                                        },
+                                        maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                        modifier = Modifier.padding(horizontal = 4.dp)
                                     )
 
                                     if (isCompleted) {

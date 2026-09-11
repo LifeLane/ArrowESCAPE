@@ -873,15 +873,26 @@ private fun FullSectionLevelNode(
             } else {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier.padding(2.dp)
                 ) {
+                    val levelDef = remember(levelId) { com.mitsara.arrowescape.engine.SilhouetteShapeRegistry.getLevelDef(levelId) }
                     Text(
                         text = "$levelId",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.ExtraBold,
-                            fontSize = 13.sp
+                            fontSize = 12.sp
                         ),
                         color = if (isCurrent) Color.White else if (isCompleted) profile.accentGlow else Color.White
+                    )
+                    Text(
+                        text = levelDef.name,
+                        fontSize = 7.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = if (isCurrent) Color.White.copy(alpha = 0.9f) else if (isCompleted) profile.accentGlow.copy(alpha = 0.8f) else Color(0xFF94A3B8),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center
                     )
 
                     // Stars Earned

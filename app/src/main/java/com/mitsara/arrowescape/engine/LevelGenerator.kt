@@ -50,8 +50,10 @@ object LevelGenerator {
         val random = Random(seed)
 
         val isMilestone = levelNumber % 10 == 0
+        val levelDef = SilhouetteShapeRegistry.getLevelDef(levelNumber)
 
-        // Strict Difficulty Progression
+        // Strict Difficulty Progression:
+        // Size & Line Density progressively scale from Level 1 to Level 500
         val targetDifficulty = when {
             levelNumber <= 50 -> Difficulty.HARD
             levelNumber <= 150 -> if (levelNumber > 100 || isMilestone) Difficulty.HARDER else Difficulty.HARD
@@ -60,23 +62,16 @@ object LevelGenerator {
             else -> Difficulty.HARDCORE
         }
 
-        val shapeType = SilhouetteShapeRegistry.getShapeForLevel(levelNumber)
         val gridSize = when (targetDifficulty) {
-            Difficulty.HARD -> shapeType.baseGridSize.coerceIn(12, 14)
-            Difficulty.HARDER -> (shapeType.baseGridSize + 1).coerceIn(13, 15)
-            Difficulty.HARDCORE -> (shapeType.baseGridSize + 2).coerceIn(14, 16)
+            Difficulty.HARD -> levelDef.baseGridSize.coerceIn(11, 13)
+            Difficulty.HARDER -> (levelDef.baseGridSize + 1).coerceIn(13, 16)
+            Difficulty.HARDCORE -> (levelDef.baseGridSize + 2).coerceIn(15, 18)
         }
 
-        val baseArrowCount = when (targetDifficulty) {
-            Difficulty.HARD -> (22 + (levelNumber * 14 / 50)).coerceIn(22, 38)
-            Difficulty.HARDER -> (36 + ((levelNumber - 50) * 28 / 250)).coerceIn(36, 65)
-            Difficulty.HARDCORE -> (58 + ((levelNumber - 300) * 35 / 200)).coerceIn(58, 95)
-        }
-        val targetArrowCount = if (isMilestone) (baseArrowCount * 1.15f).toInt() else baseArrowCount
+        val targetArrowCount = if (isMilestone) (levelDef.baseArrowCount * 1.15f).toInt() else levelDef.baseArrowCount
 
         return ArtisticSnakeLevelGenerator.generateSilhouetteLevel(
             levelNumber = levelNumber,
-            shapeType = shapeType,
             gridSize = gridSize,
             targetArrowCount = targetArrowCount,
             targetDifficulty = targetDifficulty,

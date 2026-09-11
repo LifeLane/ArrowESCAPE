@@ -29,18 +29,18 @@ object ArtisticSnakeLevelGenerator {
     }
 
     /**
-     * Synthesizes a fully solvable, densely packed silhouette puzzle.
+     * Synthesizes a fully solvable, densely packed silhouette puzzle for any of the 500 levels.
      */
     fun generateSilhouetteLevel(
         levelNumber: Int,
-        shapeType: SilhouetteShapeRegistry.ShapeType,
         gridSize: Int,
         targetArrowCount: Int,
         targetDifficulty: Difficulty,
         seed: Long
     ): PuzzleLevel {
         val random = Random(seed)
-        val mask = SilhouetteShapeRegistry.generateShapeMask(shapeType, gridSize, gridSize)
+        val levelDef = SilhouetteShapeRegistry.getLevelDef(levelNumber)
+        val mask = SilhouetteShapeRegistry.generateShapeMask(levelNumber, gridSize, gridSize)
 
         val validCells = mutableSetOf<GridPoint>()
         for (x in 0 until gridSize) {
@@ -66,7 +66,7 @@ object ArtisticSnakeLevelGenerator {
                 random = iterRandom
             )
 
-            if (candidateArrows.size >= 12) {
+            if (candidateArrows.size >= 10) {
                 val analysis = PuzzleSolver.analyzePuzzle(
                     initialArrows = candidateArrows,
                     gridWidth = gridSize,
@@ -94,7 +94,7 @@ object ArtisticSnakeLevelGenerator {
 
         return PuzzleLevel(
             id = levelNumber,
-            title = shapeType.displayName,
+            title = levelDef.name,
             difficulty = targetDifficulty,
             gridWidth = gridSize,
             gridHeight = gridSize,
