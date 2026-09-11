@@ -68,7 +68,7 @@ class GameLogicManager(val level: PuzzleLevel) {
     }
 
     /**
-     * Checks if an arrow can escape without colliding with other active arrows, obstacles, or out-of-bounds (validCells geometry).
+     * Checks if an arrow can escape without colliding with other active arrows or obstacles.
      */
     fun isArrowUnobstructed(arrow: Arrow): Boolean {
         val occupiedCells = HashSet<GridPoint>()
@@ -81,15 +81,23 @@ class GameLogicManager(val level: PuzzleLevel) {
 
         val ray = arrow.getExitRay(level.gridWidth, level.gridHeight)
         for (point in ray) {
-            val vc = level.validCells
-            if (vc != null && vc.isNotEmpty() && !vc.contains(point)) {
-                return false
-            }
             if (occupiedCells.contains(point)) {
                 return false
             }
         }
         return true
+    }
+
+    /**
+     * Finds the first active arrow or obstacle that blocks this arrow's exit path.
+     */
+    fun findFirstBlockingArrow(arrow: Arrow): Arrow? {
+        val ray = arrow.getExitRay(level.gridWidth, level.gridHeight)
+        for (point in ray) {
+            val blocker = activeArrowsList.find { it.id != arrow.id && it.getOccupiedCells().contains(point) }
+            if (blocker != null) return blocker
+        }
+        return null
     }
 
     /**

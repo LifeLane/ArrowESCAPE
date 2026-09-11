@@ -11,22 +11,37 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CenterFocusStrong
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.launch
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
@@ -39,25 +54,33 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.roundToInt
 import kotlin.math.sqrt
 import com.mitsara.arrowescape.engine.EscapePathEngine
 import com.mitsara.arrowescape.engine.PuzzleSolver
 import com.mitsara.arrowescape.model.Arrow
 import com.mitsara.arrowescape.model.Direction
 import com.mitsara.arrowescape.model.GameTheme
-import com.mitsara.arrowescape.model.ThemeManager
 import com.mitsara.arrowescape.model.GridPoint
+import com.mitsara.arrowescape.model.ThemeManager
 
 class EscapeParticle(var x: Float, var y: Float, var vx: Float, var vy: Float, var life: Float)
 
+/**
+ * Infinite Notion-Like Canvas with pinch-to-zoom, pan, infinite matrix dot grid,
+ * and high-precision conditional escape dependency visualization.
+ */
 @Composable
 fun PuzzleBoardView(
     gridWidth: Int,
@@ -89,7 +112,7 @@ fun PuzzleBoardView(
         }
     }
 
-    // Pulse animation for hint arrow
+    // Pulse animation for hint and blocking warning arrows
     val infiniteTransition = rememberInfiniteTransition(label = "hintPulse")
     val hintPulseScale by infiniteTransition.animateFloat(
         initialValue = 1.0f,
@@ -99,6 +122,16 @@ fun PuzzleBoardView(
             repeatMode = RepeatMode.Reverse
         ),
         label = "hintPulseScale"
+    )
+
+    val warningPulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 0.95f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(400),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "warningPulseAlpha"
     )
 
     // Escape progress animation driven by path length
@@ -111,6 +144,10 @@ fun PuzzleBoardView(
     
     // Store recent escapes for particle effects
     val particles = remember { mutableStateListOf<EscapeParticle>() }
+
+    // Notion Canvas Pan & Zoom State
+    var zoomScale by remember { mutableFloatStateOf(1.0f) }
+    var panOffset by remember { mutableStateOf(Offset.Zero) }
     
     LaunchedEffect(animatingArrowId) {
         if (animatingArrowId != null) {
@@ -131,13 +168,13 @@ fun PuzzleBoardView(
             // Generate particles at tip when animation finishes
             if (arrow != null) {
                 val tip = arrow.getTipCell()
-                for (i in 0..12) {
+                for (i in 0..14) {
                     particles.add(
                         EscapeParticle(
                             x = tip.x.toFloat(),
                             y = tip.y.toFloat(),
-                            vx = (Math.random() - 0.5).toFloat() * 4f,
-                            vy = (Math.random() - 0.5).toFloat() * 4f,
+                            vx = (Math.random() - 0.5).toFloat() * 4.5f,
+                            vy = (Math.random() - 0.5).toFloat() * 4.5f,
                             life = 1f
                         )
                     )
@@ -146,7 +183,7 @@ fun PuzzleBoardView(
         }
     }
     
-    // Update particles
+    // Update particles loop
     LaunchedEffect(Unit) {
         while(true) {
             if (particles.isNotEmpty()) {
@@ -163,208 +200,331 @@ fun PuzzleBoardView(
         }
     }
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier
-            .fillMaxWidth()
-            .aspectRatio(1f)
-            .offset { IntOffset(shakeOffset.value.toInt(), 0) }
-            .shadow(12.dp, shape = RoundedCornerShape(24.dp))
-            .clip(RoundedCornerShape(24.dp))
-            .background(theme.boardCanvasColor)
-            .padding(10.dp)
+            .fillMaxSize()
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color(0xFF0B0F17))
             .testTag("puzzle_board")
-            .pointerInput(gridWidth, gridHeight, activeArrows) {
-                detectTapGestures { offset ->
-                    val cW = size.width.toFloat() / gridWidth
-                    val cH = size.height.toFloat() / gridHeight
-                    val cellX = (offset.x / cW).toInt().coerceIn(0, gridWidth - 1)
-                    val cellY = (offset.y / cH).toInt().coerceIn(0, gridHeight - 1)
-                    val tappedPoint = GridPoint(cellX, cellY)
-
-                    val tappedArrow = activeArrows.find { arrow ->
-                        arrow.getOccupiedCells().contains(tappedPoint)
-                    }
-                    if (tappedArrow != null) {
-                        pressedArrowId = tappedArrow.id
-                        scope.launch {
-                            pressScale.snapTo(0.88f)
-                            pressScale.animateTo(
-                                targetValue = 1f,
-                                animationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioLowBouncy,
-                                    stiffness = 300f
-                                )
-                            )
-                        }
-                        onArrowClick(tappedArrow.id)
-                    }
-                }
-            }
     ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val cW = size.width / gridWidth
-            val cH = size.height / gridHeight
+        val canvasWidthPx = constraints.maxWidth.toFloat()
+        val canvasHeightPx = constraints.maxHeight.toFloat()
+        val boardSidePx = min(canvasWidthPx, canvasHeightPx) * 0.90f
 
-            // 1. Draw Cosmetic Board Surface
-            drawCosmeticBoardSurface(selectedBoardId, size, theme.boardCanvasColor)
+        val boardLeft = (canvasWidthPx - boardSidePx) / 2f + panOffset.x
+        val boardTop = (canvasHeightPx - boardSidePx) / 2f + panOffset.y
+        val boardCenter = Offset(boardLeft + boardSidePx / 2f, boardTop + boardSidePx / 2f)
 
-            // 2. Draw Cosmetic Grid Matrix Slots
-            drawCosmeticGridSlots(
-                gridId = selectedGridId,
-                gridWidth = gridWidth,
-                gridHeight = gridHeight,
-                cellW = cW,
-                cellH = cH,
-                validCells = validCells,
-                themeDotColor = theme.gridDotColor
-            )
-
-            // Render obstacles as glowing geometric shapes
-            for (obs in obstacles) {
-                val obsCenter = Offset(obs.x * cW + cW / 2, obs.y * cH + cH / 2)
-                val shapeRadius = minOf(cW, cH) * 0.38f
-                
-                // Outer neon glow
-                drawCircle(
-                    color = Color(0xFFFF5722).copy(alpha = 0.3f),
-                    radius = shapeRadius * 1.2f,
-                    center = obsCenter
-                )
-                
-                // Geometric Diamond / Crystal obstacle shape
-                val diamondPath = Path().apply {
-                    moveTo(obsCenter.x, obsCenter.y - shapeRadius)
-                    lineTo(obsCenter.x + shapeRadius, obsCenter.y)
-                    lineTo(obsCenter.x, obsCenter.y + shapeRadius)
-                    lineTo(obsCenter.x - shapeRadius, obsCenter.y)
-                    close()
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(gridWidth, gridHeight, activeArrows, zoomScale, panOffset) {
+                    detectTransformGestures { _, pan, zoom, _ ->
+                        zoomScale = (zoomScale * zoom).coerceIn(0.55f, 3.5f)
+                        panOffset += pan
+                    }
                 }
-                drawPath(
-                    path = diamondPath,
-                    color = Color(0xFF1E293B)
-                )
-                drawPath(
-                    path = diamondPath,
-                    color = Color(0xFFFF5722),
-                    style = Stroke(width = 3f, cap = StrokeCap.Round, join = StrokeJoin.Round)
-                )
-                // Inner core dot
-                drawCircle(
-                    color = Color.White.copy(alpha = 0.9f),
-                    radius = 4f,
-                    center = obsCenter
-                )
-            }
+                .pointerInput(gridWidth, gridHeight, activeArrows, zoomScale, panOffset) {
+                    detectTapGestures { tapOffset ->
+                        // Transform tap point from screen to board coordinates
+                        val relX = (tapOffset.x - boardCenter.x) / zoomScale + boardSidePx / 2f
+                        val relY = (tapOffset.y - boardCenter.y) / zoomScale + boardSidePx / 2f
 
-            // Render active arrows
-            for (arrow in activeArrows) {
-                val isAnimatingThis = arrow.id == animatingArrowId
-                val isHintedThis = arrow.id == hintArrowId
-                val isInspectedThis = arrow.id == inspectedArrowId
-                val isUnobstructed = PuzzleSolver.isArrowUnobstructed(arrow, activeArrows, gridWidth, gridHeight, obstacles)
+                        if (relX in 0f..boardSidePx && relY in 0f..boardSidePx) {
+                            val cW = boardSidePx / gridWidth
+                            val cH = boardSidePx / gridHeight
+                            val cellX = (relX / cW).toInt().coerceIn(0, gridWidth - 1)
+                            val cellY = (relY / cH).toInt().coerceIn(0, gridHeight - 1)
+                            val tappedPoint = GridPoint(cellX, cellY)
 
-                if (isAnimatingThis) {
-                    // Physical route-following escape animation
-                    drawEscapingArrow(
-                        arrow = arrow,
-                        gridWidth = gridWidth,
-                        gridHeight = gridHeight,
-                        cellWidthPx = cW,
-                        cellHeightPx = cH,
-                        progress = escapeProgress.value,
-                        theme = theme,
-                        selectedArrowId = selectedArrowId
-                    )
-                } else {
-                    // Laser inspection ray when tapped while blocked
-                    if (isInspectedThis) {
-                        val tip = arrow.getTipCell()
-                        val tipDir = arrow.getTipDirection()
-                        val startOffset = Offset(tip.x * cW + cW / 2, tip.y * cH + cH / 2)
-                        
-                        val occupiedCells = HashSet<GridPoint>()
-                        for (other in activeArrows) {
-                            if (other.id != arrow.id) {
-                                occupiedCells.addAll(other.getOccupiedCells())
+                            val tappedArrow = activeArrows.find { arrow ->
+                                arrow.getOccupiedCells().contains(tappedPoint)
                             }
-                        }
-                        occupiedCells.addAll(obstacles)
-                        
-                        val ray = arrow.getExitRay(gridWidth, gridHeight)
-                        var hitPoint: GridPoint? = null
-                        for (pt in ray) {
-                            if (occupiedCells.contains(pt)) {
-                                hitPoint = pt
-                                break
+                            if (tappedArrow != null) {
+                                pressedArrowId = tappedArrow.id
+                                scope.launch {
+                                    pressScale.snapTo(0.88f)
+                                    pressScale.animateTo(
+                                        targetValue = 1f,
+                                        animationSpec = spring(
+                                            dampingRatio = Spring.DampingRatioLowBouncy,
+                                            stiffness = 300f
+                                        )
+                                    )
+                                }
+                                onArrowClick(tappedArrow.id)
                             }
-                        }
-                        
-                        val endOffset = if (hitPoint != null) {
-                            Offset(hitPoint.x * cW + cW / 2, hitPoint.y * cH + cH / 2)
-                        } else {
-                            val lastRayPt = ray.lastOrNull() ?: tip
-                            Offset(lastRayPt.x * cW + cW / 2, lastRayPt.y * cH + cH / 2) + Offset(tipDir.dx * cW, tipDir.dy * cH)
-                        }
-
-                        // Outer red laser glow
-                        drawLine(
-                            color = Color(0xFFEF4444).copy(alpha = 0.7f),
-                            start = startOffset,
-                            end = endOffset,
-                            strokeWidth = minOf(cW, cH) * 0.25f,
-                            cap = StrokeCap.Round
-                        )
-                        // Inner brilliant core laser
-                        drawLine(
-                            color = Color.White.copy(alpha = 0.95f),
-                            start = startOffset,
-                            end = endOffset,
-                            strokeWidth = minOf(cW, cH) * 0.1f,
-                            cap = StrokeCap.Round
-                        )
-
-                        if (hitPoint != null) {
-                            drawCircle(
-                                color = Color(0xFFEF4444),
-                                radius = minOf(cW, cH) * 0.35f,
-                                center = endOffset
-                            )
-                            drawCircle(
-                                color = Color.White,
-                                radius = minOf(cW, cH) * 0.15f,
-                                center = endOffset
-                            )
                         }
                     }
+                }
+        ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                // 1. Draw Infinite Notion Canvas Dot Grid Background
+                val dotSpacing = 28.dp.toPx() * zoomScale
+                val startX = (panOffset.x % dotSpacing) - dotSpacing
+                val startY = (panOffset.y % dotSpacing) - dotSpacing
 
-                    val arrowScale = if (arrow.id == pressedArrowId) pressScale.value else 1.0f
+                var xPos = startX
+                while (xPos < size.width + dotSpacing) {
+                    var yPos = startY
+                    while (yPos < size.height + dotSpacing) {
+                        drawCircle(
+                            color = Color(0xFF334155).copy(alpha = 0.35f),
+                            radius = 1.4f * zoomScale.coerceIn(0.8f, 1.8f),
+                            center = Offset(xPos, yPos)
+                        )
+                        yPos += dotSpacing
+                    }
+                    xPos += dotSpacing
+                }
 
-                    drawArrowGraphics(
-                        arrow = arrow,
-                        cellWidthPx = cW,
-                        cellHeightPx = cH,
-                        isUnobstructed = isUnobstructed,
-                        isHinted = isHintedThis,
-                        hintScale = hintPulseScale,
-                        alpha = 1.0f,
-                        scale = arrowScale,
-                        theme = theme,
-                        selectedArrowId = selectedArrowId
+                // 2. Draw Zoomed & Panned Board Content
+                translate(left = boardLeft + shakeOffset.value, top = boardTop) {
+                    scale(scale = zoomScale, pivot = Offset(boardSidePx / 2f, boardSidePx / 2f)) {
+                        val cW = boardSidePx / gridWidth
+                        val cH = boardSidePx / gridHeight
+                        val boardSize = Size(boardSidePx, boardSidePx)
+
+                        // Ambient board shadow & backdrop
+                        drawRoundRect(
+                            color = Color(0xFF020617).copy(alpha = 0.85f),
+                            size = boardSize,
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(24f, 24f)
+                        )
+
+                        // Board Surface
+                        drawCosmeticBoardSurface(selectedBoardId, boardSize, theme.boardCanvasColor)
+
+                        // Grid Matrix Slots
+                        drawCosmeticGridSlots(
+                            gridId = selectedGridId,
+                            gridWidth = gridWidth,
+                            gridHeight = gridHeight,
+                            cellW = cW,
+                            cellH = cH,
+                            validCells = validCells,
+                            themeDotColor = theme.gridDotColor
+                        )
+
+                        // Render Obstacles
+                        for (obs in obstacles) {
+                            val obsCenter = Offset(obs.x * cW + cW / 2, obs.y * cH + cH / 2)
+                            val shapeRadius = minOf(cW, cH) * 0.38f
+                            
+                            drawCircle(
+                                color = Color(0xFFFF5722).copy(alpha = 0.3f),
+                                radius = shapeRadius * 1.2f,
+                                center = obsCenter
+                            )
+                            
+                            val diamondPath = Path().apply {
+                                moveTo(obsCenter.x, obsCenter.y - shapeRadius)
+                                lineTo(obsCenter.x + shapeRadius, obsCenter.y)
+                                lineTo(obsCenter.x, obsCenter.y + shapeRadius)
+                                lineTo(obsCenter.x - shapeRadius, obsCenter.y)
+                                close()
+                            }
+                            drawPath(path = diamondPath, color = Color(0xFF1E293B))
+                            drawPath(
+                                path = diamondPath,
+                                color = Color(0xFFFF5722),
+                                style = Stroke(width = 3f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                            )
+                            drawCircle(
+                                color = Color.White.copy(alpha = 0.9f),
+                                radius = 4f,
+                                center = obsCenter
+                            )
+                        }
+
+                        // Calculate collision details for inspected (blocked) arrow
+                        var blockingArrow: Arrow? = null
+                        var collisionHitPoint: GridPoint? = null
+
+                        if (inspectedArrowId != null) {
+                            val inspected = activeArrows.find { it.id == inspectedArrowId }
+                            if (inspected != null) {
+                                val ray = inspected.getExitRay(gridWidth, gridHeight)
+                                for (pt in ray) {
+                                    val blocker = activeArrows.find { it.id != inspected.id && it.getOccupiedCells().contains(pt) }
+                                    if (blocker != null) {
+                                        blockingArrow = blocker
+                                        collisionHitPoint = pt
+                                        break
+                                    }
+                                }
+                            }
+                        }
+
+                        // Render Active Arrows
+                        for (arrow in activeArrows) {
+                            val isAnimatingThis = arrow.id == animatingArrowId
+                            val isHintedThis = arrow.id == hintArrowId
+                            val isInspectedThis = arrow.id == inspectedArrowId
+                            val isBlockingThis = arrow.id == blockingArrow?.id
+                            val isUnobstructed = PuzzleSolver.isArrowUnobstructed(arrow, activeArrows, gridWidth, gridHeight, obstacles)
+
+                            if (isAnimatingThis) {
+                                drawEscapingArrow(
+                                    arrow = arrow,
+                                    gridWidth = gridWidth,
+                                    gridHeight = gridHeight,
+                                    cellWidthPx = cW,
+                                    cellHeightPx = cH,
+                                    progress = escapeProgress.value,
+                                    theme = theme,
+                                    selectedArrowId = selectedArrowId
+                                )
+                            } else {
+                                val arrowScale = if (arrow.id == pressedArrowId) pressScale.value else 1.0f
+
+                                drawArrowGraphics(
+                                    arrow = arrow,
+                                    cellWidthPx = cW,
+                                    cellHeightPx = cH,
+                                    isUnobstructed = isUnobstructed,
+                                    isHinted = isHintedThis,
+                                    isBlockingWarning = isBlockingThis,
+                                    warningAlpha = warningPulseAlpha,
+                                    hintScale = hintPulseScale,
+                                    alpha = 1.0f,
+                                    scale = arrowScale,
+                                    theme = theme,
+                                    selectedArrowId = selectedArrowId
+                                )
+
+                                // Draw laser collision line from inspected arrow to blocking arrow
+                                if (isInspectedThis) {
+                                    val tip = arrow.getTipCell()
+                                    val tipDir = arrow.getTipDirection()
+                                    val startOffset = Offset(tip.x * cW + cW / 2, tip.y * cH + cH / 2)
+                                    val endOffset = if (collisionHitPoint != null) {
+                                        Offset(collisionHitPoint.x * cW + cW / 2, collisionHitPoint.y * cH + cH / 2)
+                                    } else {
+                                        Offset(tip.x * cW + cW / 2 + tipDir.dx * cW * 2f, tip.y * cH + cH / 2 + tipDir.dy * cH * 2f)
+                                    }
+
+                                    // Outer red laser glow
+                                    drawLine(
+                                        color = Color(0xFFEF4444).copy(alpha = 0.85f),
+                                        start = startOffset,
+                                        end = endOffset,
+                                        strokeWidth = minOf(cW, cH) * 0.28f,
+                                        cap = StrokeCap.Round
+                                    )
+                                    // Inner laser beam
+                                    drawLine(
+                                        color = Color.White.copy(alpha = 0.95f),
+                                        start = startOffset,
+                                        end = endOffset,
+                                        strokeWidth = minOf(cW, cH) * 0.12f,
+                                        cap = StrokeCap.Round
+                                    )
+
+                                    if (collisionHitPoint != null) {
+                                        drawCircle(
+                                            color = Color(0xFFEF4444),
+                                            radius = minOf(cW, cH) * 0.40f,
+                                            center = endOffset
+                                        )
+                                        drawCircle(
+                                            color = Color.White,
+                                            radius = minOf(cW, cH) * 0.18f,
+                                            center = endOffset
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Draw Particles
+                        for (p in particles) {
+                            drawCircle(
+                                color = theme.arrowHighlightColor.copy(alpha = p.life),
+                                radius = (p.life * 10f),
+                                center = Offset(p.x * cW + cW / 2, p.y * cH + cH / 2)
+                            )
+                        }
+
+                        // Frame Border
+                        drawCosmeticFrameBorder(selectedFrameId, boardSize, theme.arrowHighlightColor)
+                    }
+                }
+            }
+        }
+
+        // Floating Notion Canvas Controls (Zoom In, Zoom Indicator, Zoom Out, Recenter)
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = Color(0xFF1E293B).copy(alpha = 0.92f),
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF475569).copy(alpha = 0.45f)),
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(10.dp)
+                .shadow(8.dp, RoundedCornerShape(24.dp))
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                // Zoom In (+)
+                IconButton(
+                    onClick = {
+                        zoomScale = (zoomScale * 1.25f).coerceAtMost(3.5f)
+                    },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Zoom In",
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                // Zoom Level Pill
+                Text(
+                    text = "${(zoomScale * 100).roundToInt()}%",
+                    style = androidx.compose.material3.MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp
+                    ),
+                    color = Color(0xFF94A3B8),
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
+
+                // Zoom Out (-)
+                IconButton(
+                    onClick = {
+                        zoomScale = (zoomScale / 1.25f).coerceAtLeast(0.55f)
+                    },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Remove,
+                        contentDescription = "Zoom Out",
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                // Recenter Canvas
+                IconButton(
+                    onClick = {
+                        zoomScale = 1.0f
+                        panOffset = Offset.Zero
+                    },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CenterFocusStrong,
+                        contentDescription = "Center View",
+                        tint = theme.arrowHighlightColor,
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }
-            
-            // Draw particles
-            for (p in particles) {
-                drawCircle(
-                    color = theme.arrowHighlightColor.copy(alpha = p.life),
-                    radius = (p.life * 10f),
-                    center = Offset(p.x * cW + cW/2, p.y * cH + cH/2)
-                )
-            }
-
-            // Draw Frame Border
-            drawCosmeticFrameBorder(selectedFrameId, size, theme.arrowHighlightColor)
         }
     }
 }
@@ -415,7 +575,6 @@ private fun DrawScope.drawEscapingArrow(
     val headLength = minOf(cellWidthPx, cellHeightPx) * 0.35f
     val headWidth = minOf(cellWidthPx, cellHeightPx) * 0.40f
 
-    // 1. Build escape route waypoints and continuous parameterized path
     val waypoints = EscapePathEngine.buildEscapeWaypoints(arrow, gridWidth, gridHeight, cellWidthPx, cellHeightPx)
     val cornerRadiusPx = minOf(cellWidthPx, cellHeightPx) * 0.40f
     val boardSize = max(cellWidthPx * gridWidth, cellHeightPx * gridHeight)
@@ -425,7 +584,6 @@ private fun DrawScope.drawEscapingArrow(
         boardBoundsSize = boardSize
     )
 
-    // 2. Calculate arrow rest body length
     var bodyRestLength = 0f
     for (i in 0 until occupiedCells.size - 1) {
         val p1 = occupiedCells[i]
@@ -447,7 +605,6 @@ private fun DrawScope.drawEscapingArrow(
     val tipPos = tipSample.position
     val tipAngleDeg = tipSample.angleDegrees
 
-    // 3. Draw body if arrow has length > 1
     if (bodyRestLength > 0.01f) {
         val bodyPath = path.buildBodyPath(uTail, uTip)
 
@@ -463,7 +620,6 @@ private fun DrawScope.drawEscapingArrow(
             else -> arrowColor
         }
 
-        // Outer translucent neon glow aura along shaft
         drawPath(
             path = bodyPath,
             color = glowColor.copy(alpha = 0.45f),
@@ -474,7 +630,6 @@ private fun DrawScope.drawEscapingArrow(
             )
         )
 
-        // Parallel fiber laser lines
         drawPath(
             path = bodyPath,
             color = arrowColor.copy(alpha = 0.65f),
@@ -485,7 +640,6 @@ private fun DrawScope.drawEscapingArrow(
             )
         )
 
-        // Crisp inner core line shaft
         drawPath(
             path = bodyPath,
             color = Color.White.copy(alpha = 0.95f),
@@ -497,7 +651,6 @@ private fun DrawScope.drawEscapingArrow(
         )
     }
 
-    // 4. Draw glowing Arrowhead at tip oriented with the path tangent angle
     rotate(degrees = tipAngleDeg, pivot = tipPos) {
         drawCosmeticArrowhead(
             selectedArrowId = selectedArrowId,
@@ -509,7 +662,6 @@ private fun DrawScope.drawEscapingArrow(
         )
     }
 
-    // 5. Draw delicate glowing particle spark dots trailing along the wake behind tip
     for (i in 1..4) {
         val sparkDist = i * (minOf(cellWidthPx, cellHeightPx) * 0.22f)
         val sparkSample = path.sampleAt(max(0f, uTip - sparkDist))
@@ -538,7 +690,6 @@ fun DrawScope.drawCosmeticArrowhead(
 ) {
     when (selectedArrowId) {
         "ARROW_CRYSTAL_PRISM" -> {
-            // Faceted Crystal Diamond Head
             val diamondPath = Path().apply {
                 moveTo(tipPos.x, tipPos.y - headLength * 0.85f)
                 lineTo(tipPos.x + headWidth * 0.55f, tipPos.y + headLength * 0.1f)
@@ -551,7 +702,6 @@ fun DrawScope.drawCosmeticArrowhead(
             drawLine(Color(0xFF38BDF8), Offset(tipPos.x, tipPos.y - headLength * 0.85f), Offset(tipPos.x, tipPos.y + headLength * 0.45f), 2.dp.toPx())
         }
         "ARROW_DRAGON_FLAME" -> {
-            // Dragon Flame Spearhead
             val flamePath = Path().apply {
                 moveTo(tipPos.x, tipPos.y - headLength * 0.85f)
                 cubicTo(tipPos.x + headWidth * 0.6f, tipPos.y - headLength * 0.2f, tipPos.x + headWidth * 0.6f, tipPos.y + headLength * 0.2f, tipPos.x, tipPos.y + headLength * 0.4f)
@@ -562,7 +712,6 @@ fun DrawScope.drawCosmeticArrowhead(
             drawPath(path = flamePath, color = Color(0xFFFFD600).copy(alpha = alpha * 0.9f), style = Stroke(width = 2.dp.toPx()))
         }
         "ARROW_PLASMA_BOLT" -> {
-            // Jagged Plasma Bolt
             val boltPath = Path().apply {
                 moveTo(tipPos.x, tipPos.y - headLength * 0.8f)
                 lineTo(tipPos.x + headWidth * 0.5f, tipPos.y)
@@ -578,7 +727,6 @@ fun DrawScope.drawCosmeticArrowhead(
             drawPath(path = boltPath, color = Color.White.copy(alpha = alpha * 0.95f))
         }
         "ARROW_STEAMPUNK_BRASS" -> {
-            // Steampunk Gear-Notched Pointer
             val gearPath = Path().apply {
                 moveTo(tipPos.x, tipPos.y - headLength * 0.75f)
                 lineTo(tipPos.x + headWidth * 0.45f, tipPos.y + headLength * 0.25f)
@@ -592,13 +740,11 @@ fun DrawScope.drawCosmeticArrowhead(
             drawPath(path = gearPath, color = Color(0xFFFEF3C7).copy(alpha = alpha * 0.95f), style = Stroke(width = 2.dp.toPx()))
         }
         "ARROW_RETRO_PIXEL" -> {
-            // 8-Bit Pixelated Arrow
             drawRect(Color(0xFFFF0055), Offset(tipPos.x - 3.dp.toPx(), tipPos.y - headLength * 0.7f), Size(6.dp.toPx(), 6.dp.toPx()))
             drawRect(Color(0xFFFFEE00), Offset(tipPos.x - 7.dp.toPx(), tipPos.y - headLength * 0.35f), Size(14.dp.toPx(), 6.dp.toPx()))
             drawRect(Color(0xFF00FF99), Offset(tipPos.x - 11.dp.toPx(), tipPos.y), Size(22.dp.toPx(), 6.dp.toPx()))
         }
         "ARROW_HOLOGRAM_AURA" -> {
-            // Wireframe Hologram Arrow
             val holoPath = Path().apply {
                 moveTo(tipPos.x, tipPos.y - headLength * 0.75f)
                 lineTo(tipPos.x - headWidth / 2, tipPos.y + headLength * 0.35f)
@@ -610,7 +756,6 @@ fun DrawScope.drawCosmeticArrowhead(
             drawPath(path = holoPath, color = Color(0xFF00FF99).copy(alpha = alpha * 0.95f), style = Stroke(width = 2.5.dp.toPx()))
         }
         "ARROW_GOOGLY_RAINBOW" -> {
-            // Playful Rainbow Comet Head with Cute Eyes
             val roundPath = Path().apply {
                 moveTo(tipPos.x, tipPos.y - headLength * 0.7f)
                 lineTo(tipPos.x - headWidth / 2, tipPos.y + headLength * 0.35f)
@@ -619,14 +764,12 @@ fun DrawScope.drawCosmeticArrowhead(
                 close()
             }
             drawPath(path = roundPath, color = Color(0xFFFF007F).copy(alpha = alpha * 0.9f))
-            // Googly cartoon eyes
             drawCircle(Color.White, radius = 4.dp.toPx(), center = Offset(tipPos.x - 5.dp.toPx(), tipPos.y))
             drawCircle(Color.Black, radius = 2.dp.toPx(), center = Offset(tipPos.x - 5.dp.toPx(), tipPos.y - 1.dp.toPx()))
             drawCircle(Color.White, radius = 4.dp.toPx(), center = Offset(tipPos.x + 5.dp.toPx(), tipPos.y))
             drawCircle(Color.Black, radius = 2.dp.toPx(), center = Offset(tipPos.x + 5.dp.toPx(), tipPos.y - 1.dp.toPx()))
         }
         "ARROW_GOLDEN_ROYAL" -> {
-            // 24K Royal Gilded Spearhead
             val royalPath = Path().apply {
                 moveTo(tipPos.x, tipPos.y - headLength * 0.85f)
                 lineTo(tipPos.x + headWidth * 0.5f, tipPos.y + headLength * 0.25f)
@@ -641,7 +784,6 @@ fun DrawScope.drawCosmeticArrowhead(
             drawCircle(Color(0xFFDC2626), radius = 2.5.dp.toPx(), center = Offset(tipPos.x, tipPos.y - headLength * 0.2f))
         }
         "ARROW_VOID_SINGULARITY" -> {
-            // Dark matter void blade
             val voidPath = Path().apply {
                 moveTo(tipPos.x, tipPos.y - headLength * 0.8f)
                 lineTo(tipPos.x - headWidth / 2, tipPos.y + headLength * 0.35f)
@@ -654,9 +796,8 @@ fun DrawScope.drawCosmeticArrowhead(
             drawPath(path = voidPath, color = Color(0xFFA855F7).copy(alpha = alpha * 0.9f), style = Stroke(width = 2.dp.toPx()))
         }
         else -> {
-            // Default ARROW_CYBER_NEON
             val headPath = Path().apply {
-                moveTo(tipPos.x, tipPos.y - headLength * 0.7f) // Apex
+                moveTo(tipPos.x, tipPos.y - headLength * 0.7f)
                 lineTo(tipPos.x - headWidth / 2, tipPos.y + headLength * 0.35f)
                 lineTo(tipPos.x, tipPos.y + headLength * 0.15f)
                 lineTo(tipPos.x + headWidth / 2, tipPos.y + headLength * 0.35f)
@@ -674,6 +815,8 @@ private fun DrawScope.drawArrowGraphics(
     cellHeightPx: Float,
     isUnobstructed: Boolean,
     isHinted: Boolean,
+    isBlockingWarning: Boolean = false,
+    warningAlpha: Float = 0.5f,
     hintScale: Float,
     alpha: Float,
     scale: Float = 1.0f,
@@ -691,12 +834,12 @@ private fun DrawScope.drawArrowGraphics(
     )
 
     scale(scale = scale, pivot = arrowCenter) {
-        val arrowColor = getArrowColor(arrow, isHinted, theme)
+        val baseColor = getArrowColor(arrow, isHinted, theme)
+        val arrowColor = if (isBlockingWarning) Color(0xFFEF4444) else baseColor
         val strokeWidth = minOf(cellWidthPx, cellHeightPx) * 0.12f
         val headLength = minOf(cellWidthPx, cellHeightPx) * 0.35f
         val headWidth = minOf(cellWidthPx, cellHeightPx) * 0.40f
 
-        // Build path connecting cell centers
         val linePath = Path()
         val firstPt = occupiedCells.first()
         linePath.moveTo(firstPt.x * cellWidthPx + cellWidthPx / 2, firstPt.y * cellHeightPx + cellHeightPx / 2)
@@ -706,22 +849,26 @@ private fun DrawScope.drawArrowGraphics(
             linePath.lineTo(pt.x * cellWidthPx + cellWidthPx / 2, pt.y * cellHeightPx + cellHeightPx / 2)
         }
 
-        val glowColor = when (selectedArrowId) {
-            "ARROW_DRAGON_FLAME" -> Color(0xFFFF5722)
-            "ARROW_PLASMA_BOLT" -> Color(0xFFC084FC)
-            "ARROW_CRYSTAL_PRISM" -> Color(0xFF38BDF8)
-            "ARROW_STEAMPUNK_BRASS" -> Color(0xFFF59E0B)
-            "ARROW_HOLOGRAM_AURA" -> Color(0xFF10B981)
-            "ARROW_GOOGLY_RAINBOW" -> Color(0xFFFF007F)
-            "ARROW_GOLDEN_ROYAL" -> Color(0xFFFBBF24)
-            "ARROW_VOID_SINGULARITY" -> Color(0xFFA855F7)
-            else -> arrowColor
+        val glowColor = if (isBlockingWarning) {
+            Color(0xFFEF4444)
+        } else {
+            when (selectedArrowId) {
+                "ARROW_DRAGON_FLAME" -> Color(0xFFFF5722)
+                "ARROW_PLASMA_BOLT" -> Color(0xFFC084FC)
+                "ARROW_CRYSTAL_PRISM" -> Color(0xFF38BDF8)
+                "ARROW_STEAMPUNK_BRASS" -> Color(0xFFF59E0B)
+                "ARROW_HOLOGRAM_AURA" -> Color(0xFF10B981)
+                "ARROW_GOOGLY_RAINBOW" -> Color(0xFFFF007F)
+                "ARROW_GOLDEN_ROYAL" -> Color(0xFFFBBF24)
+                "ARROW_VOID_SINGULARITY" -> Color(0xFFA855F7)
+                else -> arrowColor
+            }
         }
 
-        // Draw outer translucent neon glow aura along shaft
+        // Draw outer translucent glow aura along shaft
         drawPath(
             path = linePath,
-            color = glowColor.copy(alpha = alpha * 0.45f),
+            color = glowColor.copy(alpha = if (isBlockingWarning) warningAlpha * 0.7f else alpha * 0.45f),
             style = Stroke(
                 width = strokeWidth * 2.4f,
                 cap = StrokeCap.Round,
@@ -751,7 +898,6 @@ private fun DrawScope.drawArrowGraphics(
             )
         )
 
-        // Tip cell & Direction
         val tipCell = arrow.getTipCell()
         val tipCenter = Offset(
             tipCell.x * cellWidthPx + cellWidthPx / 2,
@@ -759,7 +905,6 @@ private fun DrawScope.drawArrowGraphics(
         )
         val tipDirection = arrow.getTipDirection()
 
-        // Draw translucent glowing Arrowhead at tip
         rotate(degrees = tipDirection.rotationDegrees, pivot = tipCenter) {
             drawCosmeticArrowhead(
                 selectedArrowId = selectedArrowId,
@@ -771,7 +916,7 @@ private fun DrawScope.drawArrowGraphics(
             )
         }
 
-        // Concentric Ripple Target on Hinted/Selected Arrow
+        // Concentric Ripple Target on Hinted Arrow
         if (isHinted) {
             val baseRadius = minOf(cellWidthPx, cellHeightPx) * 0.32f
             drawCircle(
@@ -787,6 +932,16 @@ private fun DrawScope.drawArrowGraphics(
             drawCircle(
                 color = Color.White.copy(alpha = 0.95f * alpha),
                 radius = baseRadius * 0.35f,
+                center = tipCenter
+            )
+        }
+
+        // Concentric Warning Halo on Blocking Arrow
+        if (isBlockingWarning) {
+            val baseRadius = minOf(cellWidthPx, cellHeightPx) * 0.40f
+            drawCircle(
+                color = Color(0xFFEF4444).copy(alpha = warningAlpha * 0.5f),
+                radius = baseRadius * 1.3f,
                 center = tipCenter
             )
         }

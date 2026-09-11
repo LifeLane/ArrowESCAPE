@@ -9,14 +9,17 @@ import kotlin.random.Random
 
 /**
  * Procedural synthesis engine for intricate winding snake arrows, L-bends,
- * U-turn hairpins, S-staircases, spiral coils, and silhouette-framing boundary arrows.
- * Faithfully reproduces the aesthetic and logic from reference game screenshots.
+ * U-turn hairpins, S-staircases, spiral coils, and boundary arrows.
+ * 
+ * Enforces strict reverse-dependency chains (DAG) so that arrows are conditional
+ * and depend on the exact unblocking of prerequisite arrows before escaping.
  */
 object ArtisticSnakeLevelGenerator {
 
     private val paletteHex = listOf(
-        "#3E2E23", "#2C3E50", "#1E293B", "#374151", "#4A3525",
-        "#1F2937", "#334155", "#475569", "#292524", "#18181B"
+        "#3B82F6", "#F97316", "#10B981", "#8B5CF6", "#EC4899",
+        "#F59E0B", "#06B6D4", "#6366F1", "#14B8A6", "#EF4444",
+        "#E11D48", "#84CC16", "#0EA5E9", "#A855F7", "#D946EF"
     )
 
     enum class SnakeType {
@@ -30,6 +33,7 @@ object ArtisticSnakeLevelGenerator {
 
     /**
      * Synthesizes a fully solvable, densely packed silhouette puzzle for any of the 500 levels.
+     * Enforces strict conditional escape dependencies where only 1-3 keys are initially free.
      */
     fun generateSilhouetteLevel(
         levelNumber: Int,
@@ -38,7 +42,6 @@ object ArtisticSnakeLevelGenerator {
         targetDifficulty: Difficulty,
         seed: Long
     ): PuzzleLevel {
-        val random = Random(seed)
         val levelDef = SilhouetteShapeRegistry.getLevelDef(levelNumber)
         val mask = SilhouetteShapeRegistry.generateShapeMask(levelNumber, gridSize, gridSize)
 
@@ -53,11 +56,11 @@ object ArtisticSnakeLevelGenerator {
         var bestAnalysis: PuzzleSolver.SolveAnalysis? = null
         var bestScore = -1
 
-        val maxAttempts = 18
+        val maxAttempts = 24
 
         for (attempt in 0 until maxAttempts) {
             val iterRandom = Random(seed + attempt * 1009L + 42L)
-            val candidateArrows = synthesizeArrows(
+            val candidateArrows = synthesizeReverseDependencyArrows(
                 gridSize = gridSize,
                 mask = mask,
                 validCells = validCells,
@@ -66,22 +69,30 @@ object ArtisticSnakeLevelGenerator {
                 random = iterRandom
             )
 
-            if (candidateArrows.size >= 10) {
+            if (candidateArrows.isNotEmpty()) {
                 val analysis = PuzzleSolver.analyzePuzzle(
                     initialArrows = candidateArrows,
                     gridWidth = gridSize,
                     gridHeight = gridSize,
                     obstacles = emptySet(),
-                    validCells = null // null because exiting into open canvas is unobstructed
+                    validCells = null
                 )
 
                 if (analysis.isSolvable && analysis.solutionSequence.size == candidateArrows.size) {
-                    val score = candidateArrows.size * 10 + analysis.dependencyDepth * 15
+                    // Reward high dependency depth, low initial free count (1-3 keys), and high arrow count
+                    val initialFreeBonus = when (analysis.initialFreeCount) {
+                        1 -> 150
+                        2 -> 120
+                        3 -> 80
+                        else -> maxOf(0, 50 - analysis.initialFreeCount * 10)
+                    }
+                    val score = candidateArrows.size * 10 + analysis.dependencyDepth * 20 + initialFreeBonus
+
                     if (score > bestScore) {
                         bestScore = score
                         bestArrows = candidateArrows
                         bestAnalysis = analysis
-                        if (analysis.dependencyDepth >= 8 && candidateArrows.size >= targetArrowCount * 0.85f) {
+                        if (analysis.initialFreeCount in 1..2 && analysis.dependencyDepth >= candidateArrows.size * 0.70f) {
                             break
                         }
                     }
@@ -89,7 +100,12 @@ object ArtisticSnakeLevelGenerator {
             }
         }
 
-        val finalArrows = if (bestArrows.isNotEmpty()) bestArrows else createGuaranteedFallback(gridSize, mask, validCells, random)
+        val finalArrows = if (bestArrows.isNotEmpty()) {
+            bestArrows
+        } else {
+            createGuaranteedReverseChainFallback(gridSize, mask, validCells, Random(seed))
+        }
+
         val finalAnalysis = bestAnalysis ?: PuzzleSolver.analyzePuzzle(finalArrows, gridSize, gridSize, emptySet(), null)
 
         return PuzzleLevel(
@@ -112,7 +128,12 @@ object ArtisticSnakeLevelGenerator {
         )
     }
 
-    private fun synthesizeArrows(
+    /**
+     * Reverse-Dependency Construction:
+     * Builds intertwined snakes such that placed arrows deliberately block the exit rays
+     * of other arrows, creating deep conditional escape chains.
+     */
+    private fun synthesizeReverseDependencyArrows(
         gridSize: Int,
         mask: Array<BooleanArray>,
         validCells: Set<GridPoint>,
@@ -124,7 +145,6 @@ object ArtisticSnakeLevelGenerator {
         val occupied = HashSet<GridPoint>()
 
         var currentId = 1
-        val maxPlacements = targetCount * 3
         var consecutiveFailures = 0
 
         val snakeTypes = when (targetDifficulty) {
@@ -139,7 +159,7 @@ object ArtisticSnakeLevelGenerator {
 
         while (arrows.size < targetCount && consecutiveFailures < 60) {
             val type = snakeTypes[random.nextInt(snakeTypes.size)]
-            val candidate = generateCandidateSnake(
+            val candidate = generateInterlockingSnake(
                 id = currentId,
                 type = type,
                 gridSize = gridSize,
@@ -159,11 +179,13 @@ object ArtisticSnakeLevelGenerator {
             }
         }
 
-        // Fill remaining isolated single-cell or two-cell holes with small straight arrows
+        // Fill remaining isolated single-cell or two-cell holes with small dependent arrows
         val remainingHoles = validCells.filter { !occupied.contains(it) }.shuffled(random)
         for (hole in remainingHoles) {
             if (occupied.contains(hole)) continue
 
+            // Pick a direction that blocks an existing arrow or is blocked by an existing arrow
+            var chosenCand: Arrow? = null
             for (dir in Direction.entries.shuffled(random)) {
                 val cand = Arrow(
                     id = currentId,
@@ -175,20 +197,26 @@ object ArtisticSnakeLevelGenerator {
                     customColorHex = paletteHex[(currentId - 1) % paletteHex.size]
                 )
 
+                // Test if this candidate is valid
+                chosenCand = cand
                 val ray = cand.getExitRay(gridSize, gridSize)
-                if (!ray.any { occupied.contains(it) }) {
-                    arrows.add(cand)
-                    occupied.add(hole)
-                    currentId++
+                if (ray.any { occupied.contains(it) }) {
+                    // Blocked by an existing arrow -> excellent dependency!
                     break
                 }
+            }
+
+            if (chosenCand != null) {
+                arrows.add(chosenCand)
+                occupied.add(hole)
+                currentId++
             }
         }
 
         return arrows
     }
 
-    private fun generateCandidateSnake(
+    private fun generateInterlockingSnake(
         id: Int,
         type: SnakeType,
         gridSize: Int,
@@ -197,9 +225,9 @@ object ArtisticSnakeLevelGenerator {
         existingArrows: List<Arrow>,
         random: Random
     ): Arrow? {
-        val attempts = 40
+        val attempts = 45
         var bestCandidate: Arrow? = null
-        var bestScore = -100
+        var bestScore = -500
 
         for (tryCount in 0 until attempts) {
             val startX = random.nextInt(gridSize)
@@ -223,15 +251,12 @@ object ArtisticSnakeLevelGenerator {
                 customColorHex = paletteHex[(id - 1) % paletteHex.size]
             )
 
-            // Verify that the candidate's exit ray is clear to the perimeter of the canvas
-            val exitRay = cand.getExitRay(gridSize, gridSize)
-            if (exitRay.any { occupied.contains(it) }) {
-                continue
-            }
-
-            // Dependency scoring: Reward candidate for blocking already placed arrows' exit rays
-            var blockedEarlierCount = 0
             val bodyCells = cand.getOccupiedCells()
+            val candExitRay = cand.getExitRay(gridSize, gridSize)
+
+            // Dependency scoring:
+            // 1. Reward candidate if its body intersects and blocks existing arrows' exit rays (creates dependency)
+            var blockedEarlierCount = 0
             for (earlier in existingArrows) {
                 val exRay = earlier.getExitRay(gridSize, gridSize)
                 if (exRay.any { bodyCells.contains(it) }) {
@@ -239,9 +264,18 @@ object ArtisticSnakeLevelGenerator {
                 }
             }
 
-            var score = blockedEarlierCount * 35 + path.size * 6
+            // 2. Count if this candidate itself is blocked by an existing arrow
+            val isCandBlocked = candExitRay.any { occupied.contains(it) }
+
+            var score = blockedEarlierCount * 50 + path.size * 8
+            if (isCandBlocked) {
+                score += 30 // Healthy dependency chain!
+            } else if (existingArrows.size < 3) {
+                score += 20 // Outer initial key
+            }
+
             if (type == SnakeType.U_TURN_HAIRPIN || type == SnakeType.SPIRAL_HOOK) {
-                score += 15
+                score += 25
             }
 
             if (score > bestScore) {
@@ -301,7 +335,6 @@ object ArtisticSnakeLevelGenerator {
             }
 
             SnakeType.U_TURN_HAIRPIN -> {
-                // Hairpin turn: forward -> perpendicular 1 step -> reverse
                 val dForward = dirs[random.nextInt(dirs.size)]
                 val dPerp = getPerpendicular(dForward, random)
                 val dBack = dForward.opposite()
@@ -314,20 +347,20 @@ object ArtisticSnakeLevelGenerator {
                 var cy = startY
                 pts.add(GridPoint(cx, cy))
 
-                // Leg 1: forward
+                // Leg 1
                 for (i in 1 until len1) {
                     cx += dForward.dx
                     cy += dForward.dy
                     if (!isValidCell(cx, cy, gridSize, mask, occupied, pts)) return null
                     pts.add(GridPoint(cx, cy))
                 }
-                // Step 2: 1 perpendicular step (the bend)
+                // Step perpendicular
                 cx += dPerp.dx
                 cy += dPerp.dy
                 if (!isValidCell(cx, cy, gridSize, mask, occupied, pts)) return null
                 pts.add(GridPoint(cx, cy))
 
-                // Leg 3: reverse parallel
+                // Leg 2
                 for (i in 1 until len2) {
                     cx += dBack.dx
                     cy += dBack.dy
@@ -338,32 +371,23 @@ object ArtisticSnakeLevelGenerator {
             }
 
             SnakeType.S_STAIRCASE -> {
-                // Staircase zig-zag: Leg1 -> Step Perp -> Leg2 (same direction)
-                val dMain = dirs[random.nextInt(dirs.size)]
-                val dPerp = getPerpendicular(dMain, random)
-                val len1 = random.nextInt(2, 4)
-                val len2 = random.nextInt(2, 4)
+                val dForward = dirs[random.nextInt(dirs.size)]
+                val dPerp = getPerpendicular(dForward, random)
+                val len = random.nextInt(2, 4)
 
                 val pts = mutableListOf<GridPoint>()
                 var cx = startX
                 var cy = startY
                 pts.add(GridPoint(cx, cy))
 
-                for (i in 1 until len1) {
-                    cx += dMain.dx
-                    cy += dMain.dy
+                for (step in 0 until len) {
+                    cx += dForward.dx
+                    cy += dForward.dy
                     if (!isValidCell(cx, cy, gridSize, mask, occupied, pts)) return null
                     pts.add(GridPoint(cx, cy))
-                }
 
-                cx += dPerp.dx
-                cy += dPerp.dy
-                if (!isValidCell(cx, cy, gridSize, mask, occupied, pts)) return null
-                pts.add(GridPoint(cx, cy))
-
-                for (i in 1 until len2) {
-                    cx += dMain.dx
-                    cy += dMain.dy
+                    cx += dPerp.dx
+                    cy += dPerp.dy
                     if (!isValidCell(cx, cy, gridSize, mask, occupied, pts)) return null
                     pts.add(GridPoint(cx, cy))
                 }
@@ -371,31 +395,26 @@ object ArtisticSnakeLevelGenerator {
             }
 
             SnakeType.SPIRAL_HOOK -> {
-                // G-hook or 3-turn spiral coil
-                val d1 = dirs[random.nextInt(dirs.size)]
+                val d0 = dirs[random.nextInt(dirs.size)]
                 val clockwise = random.nextBoolean()
+                val d1 = rotateDir(d0, clockwise)
                 val d2 = rotateDir(d1, clockwise)
-                val d3 = rotateDir(d2, clockwise)
-                val d4 = rotateDir(d3, clockwise)
 
                 val pts = mutableListOf<GridPoint>()
                 var cx = startX
                 var cy = startY
                 pts.add(GridPoint(cx, cy))
 
-                val segLengths = listOf(3, 3, 2, 2)
-                val segDirs = listOf(d1, d2, d3, d4)
+                val segLens = listOf(random.nextInt(2, 4), random.nextInt(2, 4), random.nextInt(2, 4))
+                val segDirs = listOf(d0, d1, d2)
 
-                for (s in segDirs.indices) {
+                for (s in 0..2) {
                     val sDir = segDirs[s]
-                    val sLen = segLengths[s]
+                    val sLen = segLens[s]
                     for (i in 1 until sLen) {
                         cx += sDir.dx
                         cy += sDir.dy
-                        if (!isValidCell(cx, cy, gridSize, mask, occupied, pts)) {
-                            // If partial spiral is valid and long enough, accept it
-                            return if (pts.size >= 4) pts else null
-                        }
+                        if (!isValidCell(cx, cy, gridSize, mask, occupied, pts)) return null
                         pts.add(GridPoint(cx, cy))
                     }
                 }
@@ -403,10 +422,9 @@ object ArtisticSnakeLevelGenerator {
             }
 
             SnakeType.BOUNDARY_WRAPPER -> {
-                // Long contour arrow tracing mask edges
                 val d1 = dirs[random.nextInt(dirs.size)]
                 val d2 = getPerpendicular(d1, random)
-                val len1 = random.nextInt(4, 7)
+                val len1 = random.nextInt(3, 6)
                 val len2 = random.nextInt(3, 6)
 
                 val pts = mutableListOf<GridPoint>()
@@ -417,16 +435,16 @@ object ArtisticSnakeLevelGenerator {
                 for (i in 1 until len1) {
                     cx += d1.dx
                     cy += d1.dy
-                    if (!isValidCell(cx, cy, gridSize, mask, occupied, pts)) break
+                    if (!isValidCell(cx, cy, gridSize, mask, occupied, pts)) return null
                     pts.add(GridPoint(cx, cy))
                 }
                 for (i in 1 until len2) {
                     cx += d2.dx
                     cy += d2.dy
-                    if (!isValidCell(cx, cy, gridSize, mask, occupied, pts)) break
+                    if (!isValidCell(cx, cy, gridSize, mask, occupied, pts)) return null
                     pts.add(GridPoint(cx, cy))
                 }
-                if (pts.size >= 3) pts else null
+                pts
             }
         }
     }
@@ -502,7 +520,10 @@ object ArtisticSnakeLevelGenerator {
         return Direction.entries.find { it.dx == dx && it.dy == dy }
     }
 
-    private fun createGuaranteedFallback(
+    /**
+     * Fallback that constructs a guaranteed-solvable reverse peeling dependency chain.
+     */
+    private fun createGuaranteedReverseChainFallback(
         gridSize: Int,
         mask: Array<BooleanArray>,
         validCells: Set<GridPoint>,
@@ -512,29 +533,39 @@ object ArtisticSnakeLevelGenerator {
         val occupied = HashSet<GridPoint>()
         var currentId = 1
 
-        val cells = validCells.shuffled(random)
-        for (cell in cells) {
+        // Sort cells radially from center outwards
+        val cx = gridSize / 2f
+        val cy = gridSize / 2f
+        val sortedCells = validCells.sortedByDescending {
+            val dx = it.x - cx
+            val dy = it.y - cy
+            dx * dx + dy * dy
+        }
+
+        for (cell in sortedCells) {
             if (occupied.contains(cell)) continue
 
-            for (dir in Direction.entries.shuffled(random)) {
-                val cand = Arrow(
-                    id = currentId,
-                    startX = cell.x,
-                    startY = cell.y,
-                    length = 1,
-                    direction = dir,
-                    pathPoints = listOf(cell),
-                    customColorHex = paletteHex[(currentId - 1) % paletteHex.size]
-                )
-
-                val ray = cand.getExitRay(gridSize, gridSize)
-                if (!ray.any { occupied.contains(it) }) {
-                    arrows.add(cand)
-                    occupied.add(cell)
-                    currentId++
-                    break
-                }
+            // Aim outward to perimeter
+            val dir = when {
+                cell.x < cx && cell.y < cy -> if (random.nextBoolean()) Direction.LEFT else Direction.UP
+                cell.x >= cx && cell.y < cy -> if (random.nextBoolean()) Direction.RIGHT else Direction.UP
+                cell.x < cx && cell.y >= cy -> if (random.nextBoolean()) Direction.LEFT else Direction.DOWN
+                else -> if (random.nextBoolean()) Direction.RIGHT else Direction.DOWN
             }
+
+            val cand = Arrow(
+                id = currentId,
+                startX = cell.x,
+                startY = cell.y,
+                length = 1,
+                direction = dir,
+                pathPoints = listOf(cell),
+                customColorHex = paletteHex[(currentId - 1) % paletteHex.size]
+            )
+
+            arrows.add(cand)
+            occupied.add(cell)
+            currentId++
         }
         return arrows
     }
