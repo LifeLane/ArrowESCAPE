@@ -51,12 +51,7 @@ object LevelGenerator {
 
         val isMilestone = levelNumber % 10 == 0
 
-        // Strict Difficulty Progression:
-        // Levels 1–50: HARD
-        // Levels 51–150: HARD -> HARDER
-        // Levels 151–300: HARDER
-        // Levels 301–500: HARDER -> HARDCORE
-        // Levels 501+: HARDCORE
+        // Strict Difficulty Progression
         val targetDifficulty = when {
             levelNumber <= 50 -> Difficulty.HARD
             levelNumber <= 150 -> if (levelNumber > 100 || isMilestone) Difficulty.HARDER else Difficulty.HARD
@@ -65,164 +60,26 @@ object LevelGenerator {
             else -> Difficulty.HARDCORE
         }
 
-        // Dynamically Expand Grid Matrix Scale (8x8 to 15x15)
+        val shapeType = SilhouetteShapeRegistry.getShapeForLevel(levelNumber)
         val gridSize = when (targetDifficulty) {
-            Difficulty.HARD -> {
-                when {
-                    levelNumber <= 15 -> 8
-                    levelNumber <= 35 -> 9
-                    else -> 10
-                }
-            }
-            Difficulty.HARDER -> {
-                when {
-                    levelNumber <= 120 -> 10
-                    levelNumber <= 220 -> 11
-                    else -> 12
-                }
-            }
-            Difficulty.HARDCORE -> {
-                when {
-                    levelNumber <= 380 -> 12
-                    levelNumber <= 440 -> 13
-                    levelNumber <= 500 -> 14
-                    else -> 15
-                }
-            }
+            Difficulty.HARD -> shapeType.baseGridSize.coerceIn(12, 14)
+            Difficulty.HARDER -> (shapeType.baseGridSize + 1).coerceIn(13, 15)
+            Difficulty.HARDCORE -> (shapeType.baseGridSize + 2).coerceIn(14, 16)
         }
 
-        // Target Arrow Count Scaling
         val baseArrowCount = when (targetDifficulty) {
-            Difficulty.HARD -> (20 + (levelNumber * 18 / 50)).coerceIn(20, 38)
-            Difficulty.HARDER -> (38 + ((levelNumber - 50) * 32 / 250)).coerceIn(38, 70)
-            Difficulty.HARDCORE -> (60 + ((levelNumber - 300) * 45 / 200)).coerceIn(60, 110)
+            Difficulty.HARD -> (22 + (levelNumber * 14 / 50)).coerceIn(22, 38)
+            Difficulty.HARDER -> (36 + ((levelNumber - 50) * 28 / 250)).coerceIn(36, 65)
+            Difficulty.HARDCORE -> (58 + ((levelNumber - 300) * 35 / 200)).coerceIn(58, 95)
         }
-        val targetArrowCount = if (isMilestone) (baseArrowCount * 1.12f).toInt() else baseArrowCount
+        val targetArrowCount = if (isMilestone) (baseArrowCount * 1.15f).toInt() else baseArrowCount
 
-        // Board Shape & Geometric Mask
-        val shape = if (isMilestone) {
-            val milestoneShapes = listOf(BoardShape.CROSS, BoardShape.DIAMOND, BoardShape.DONUT, BoardShape.CORRIDOR_CHAMBER)
-            milestoneShapes[((levelNumber / 10) - 1) % milestoneShapes.size]
-        } else {
-            val shapes = BoardShape.entries.toTypedArray()
-            shapes[random.nextInt(shapes.size)]
-        }
-
-        val mask = generateMask(gridSize, shape)
-        val validCells = mutableSetOf<GridPoint>()
-        for (x in 0 until gridSize) {
-            for (y in 0 until gridSize) {
-                if (mask[x][y]) validCells.add(GridPoint(x, y))
-            }
-        }
-
-        // Procedural Obstacle Formations & Choke Points
-        val baseObstacleCount = when (targetDifficulty) {
-            Difficulty.HARD -> (gridSize / 2) + random.nextInt(2, 5)
-            Difficulty.HARDER -> gridSize + random.nextInt(3, 7)
-            Difficulty.HARDCORE -> (gridSize * 1.3f).toInt() + random.nextInt(4, 8)
-        }
-        val targetObstacleCount = if (isMilestone) baseObstacleCount + 3 else baseObstacleCount
-
-        val formationTypes = ObstacleFormationGenerator.FormationType.entries.toTypedArray()
-        val formationType = formationTypes[random.nextInt(formationTypes.size)]
-
-        val obstacles = ObstacleFormationGenerator.generateObstacles(
-            gridSize = gridSize,
-            targetObstacleCount = targetObstacleCount,
-            formationType = formationType,
-            random = Random(seed + 12345L),
-            validCells = validCells
-        )
-
-        val levelTitle = if (isMilestone) "Boss Challenge Lv $levelNumber" else "Level $levelNumber"
-        val multiCellProb = when (targetDifficulty) {
-            Difficulty.HARD -> 0.45f
-            Difficulty.HARDER -> 0.60f
-            Difficulty.HARDCORE -> 0.75f
-        }
-
-        var bestCandidate: PuzzleLevel? = null
-        var bestScore = -1
-        var attempts = 0
-        val maxAttempts = 30
-
-        while (attempts < maxAttempts) {
-            attempts++
-            val iterationRandom = Random(seed + attempts * 827L)
-
-            val generatedArrows = generateDependentReverseConstruction(
-                gridSize = gridSize,
-                targetCount = targetArrowCount,
-                multiCellProb = multiCellProb,
-                mask = mask,
-                obstacles = obstacles,
-                targetDifficulty = targetDifficulty,
-                random = iterationRandom
-            )
-
-            if (generatedArrows.size >= 14) {
-                val candidate = PuzzleLevel(
-                    id = levelNumber,
-                    title = levelTitle,
-                    difficulty = targetDifficulty,
-                    gridWidth = gridSize,
-                    gridHeight = gridSize,
-                    arrows = generatedArrows,
-                    startingLives = 3,
-                    maxHints = 3,
-                    validCells = validCells,
-                    obstacles = obstacles
-                )
-
-                val analysis = PuzzleSolver.analyzePuzzle(candidate.arrows, gridSize, gridSize, obstacles, validCells)
-                if (analysis.isSolvable && analysis.solutionSequence.size == candidate.arrows.size) {
-                    val report = LevelDifficultyScorer.evaluateLevel(
-                        gridSize = gridSize,
-                        arrows = generatedArrows,
-                        obstacles = obstacles,
-                        validCells = validCells,
-                        targetDifficulty = targetDifficulty,
-                        levelNumber = levelNumber,
-                        analysis = analysis
-                    )
-
-                    val candidateFingerprint = LevelFingerprint.from(
-                        gridWidth = gridSize,
-                        gridHeight = gridSize,
-                        arrows = generatedArrows,
-                        obstacles = obstacles,
-                        dependencyDepth = analysis.dependencyDepth
-                    )
-
-                    val isRepetitive = fingerprintCache.isTooSimilar(candidateFingerprint)
-
-                    if (report.passesQualityGate && !isRepetitive) {
-                        fingerprintCache.record(candidateFingerprint)
-                        return candidate.copy(
-                            dependencyDepth = report.dependencyDepth,
-                            difficultyScore = report.compositeScore
-                        )
-                    }
-
-                    if (report.compositeScore > bestScore) {
-                        bestScore = report.compositeScore
-                        bestCandidate = candidate.copy(
-                            dependencyDepth = report.dependencyDepth,
-                            difficultyScore = report.compositeScore
-                        )
-                    }
-                }
-            }
-        }
-
-        return bestCandidate ?: createRobustFallbackLevel(
+        return ArtisticSnakeLevelGenerator.generateSilhouetteLevel(
             levelNumber = levelNumber,
+            shapeType = shapeType,
             gridSize = gridSize,
-            targetCount = targetArrowCount,
-            difficulty = targetDifficulty,
-            obstacles = obstacles,
-            validCells = validCells,
+            targetArrowCount = targetArrowCount,
+            targetDifficulty = targetDifficulty,
             seed = seed
         )
     }

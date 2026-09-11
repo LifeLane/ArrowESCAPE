@@ -21,6 +21,24 @@ data class GameTheme(
 )
 
 object ThemeManager {
+    val EYE_COMFORT = GameTheme(
+        id = "EYE_COMFORT",
+        displayName = "Eye Comfort Parchment",
+        consoleStyleName = "Warm Minimalist Ink",
+        isPremiumOnly = false,
+        palette = listOf(Color(0xFF3E2E23), Color(0xFF2C3E50), Color(0xFF4A3525), Color(0xFF1E293B), Color(0xFF334155)),
+        gridStyle = "Subtle Tan Dot Matrix",
+        arrowStyle = "Clean Ink Contour",
+        backgroundShaderName = "Soft Parchment Paper",
+        animationSpeedMs = 180,
+        boardCanvasColor = Color(0xFFFAF6EE),
+        gridDotColor = Color(0xFFE5DAC8),
+        arrowNormalColor = Color(0xFF3E2E23),
+        arrowHighlightColor = Color(0xFF0284C7),
+        textPrimaryColor = Color(0xFFB47D28),
+        surfaceBackgroundColor = Color(0xFFFAF6EE)
+    )
+
     val RETRO_ARCADE = GameTheme(
         id = "RETRO_ARCADE",
         displayName = "8-Bit Arcade Console",
@@ -129,11 +147,11 @@ object ThemeManager {
         surfaceBackgroundColor = Color(0xFF020617)
     )
 
-    val allThemes = listOf(RETRO_ARCADE, GOOGLY, CYBER_TERMINAL, ZEN_WOOD, VAPORWAVE, QUANTUM_NEBULA)
+    val allThemes = listOf(EYE_COMFORT, RETRO_ARCADE, GOOGLY, CYBER_TERMINAL, ZEN_WOOD, VAPORWAVE, QUANTUM_NEBULA)
 
     val entries = allThemes
 
     fun getTheme(id: String): GameTheme {
-        return allThemes.find { it.id.equals(id, ignoreCase = true) } ?: RETRO_ARCADE
+        return allThemes.find { it.id.equals(id, ignoreCase = true) } ?: EYE_COMFORT
     }
 }

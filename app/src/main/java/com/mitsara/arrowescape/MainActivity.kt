@@ -36,6 +36,7 @@ sealed class Screen {
     object MainMenu : Screen()
     object LevelSelect : Screen()
     data class Gameplay(val levelId: Int) : Screen()
+    object EndlessMode : Screen()
     object DailyChallenge : Screen()
     object Statistics : Screen()
     object Store : Screen()
@@ -93,6 +94,8 @@ fun ArrowEscapeApp(viewModel: GameViewModel) {
                     val nextTheme = if (isGoogly) "RETRO_ARCADE" else "GOOGLY"
                     viewModel.selectTheme(nextTheme)
                 },
+                onEndlessClick = { currentScreen = Screen.EndlessMode },
+
                 onPlayClick = {
                     currentScreen = Screen.Gameplay(userSettings.currentLevelId)
                 },
@@ -120,6 +123,14 @@ fun ArrowEscapeApp(viewModel: GameViewModel) {
                 onBackClick = { currentScreen = Screen.MainMenu }
             )
         }
+        is Screen.EndlessMode -> {
+            com.mitsara.arrowescape.ui.screens.EndlessGameplayScreen(
+                userSettings = userSettings,
+                onBackClick = { currentScreen = Screen.MainMenu },
+                onSettingsClick = { currentScreen = Screen.Settings }
+            )
+        }
+
         is Screen.LevelSelect -> {
             PhaseRoadmapScreen(
                 currentLevelId = userSettings.currentLevelId,

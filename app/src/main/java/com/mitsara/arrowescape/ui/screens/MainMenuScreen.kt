@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.AllInclusive
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.GridOn
 import androidx.compose.material.icons.filled.Info
@@ -57,6 +58,7 @@ fun MainMenuScreen(
     selectedTheme: String = "LIGHT",
     onToggleGooglyTheme: (() -> Unit)? = null,
     onPlayClick: () -> Unit,
+    onEndlessClick: () -> Unit,
     onLevelSelectClick: () -> Unit,
     onDailyChallengeClick: () -> Unit,
     onStatsClick: () -> Unit,
@@ -245,7 +247,19 @@ fun MainMenuScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 // Level Roadmap / Selection
+                // Endless Mode
                 AnimatedMenuCard(
+                    title = "ENDLESS MODE",
+                    subtitle = "Never ending procedural challenge",
+                    icon = Icons.Default.AllInclusive,
+                    iconTint = if (isGooglyMode) Color(0xFF00FFCC) else Color(0xFF8B5CF6),
+                    onClick = onEndlessClick,
+                    isGooglyMode = isGooglyMode,
+                    badgeText = "INFINITE",
+                    testTag = "endless_button"
+                )
+                AnimatedMenuCard(
+
                     title = "LEVEL ROADMAP",
                     subtitle = "10 Worlds • 500 Unique Stages",
                     icon = Icons.Default.GridOn,

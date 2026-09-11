@@ -46,6 +46,7 @@ fun CosmeticBackgroundCanvas(
         val h = size.height
 
         when (backgroundId) {
+            "BG_CALM_PARCHMENT" -> drawCalmParchment(w, h, time)
             "BG_CYBER_GRID_WARP" -> drawCyberGridWarp(w, h, time)
             "BG_AURORA_BOREALIS" -> drawAuroraBorealis(w, h, time)
             "BG_MATRIX_CODE" -> drawMatrixCode(w, h, time)
@@ -63,6 +64,14 @@ fun CosmeticBackgroundCanvas(
 // =========================================================================
 // BACKGROUND DRAWING PROCEDURAL IMPLEMENTATIONS
 // =========================================================================
+
+private fun DrawScope.drawCalmParchment(w: Float, h: Float, t: Float) {
+    drawRect(
+        brush = Brush.verticalGradient(
+            colors = listOf(Color(0xFFFAF6EE), Color(0xFFF6F0E4), Color(0xFFFAF6EE))
+        )
+    )
+}
 
 private fun DrawScope.drawDeepCosmos(w: Float, h: Float, t: Float) {
     // Deep dark galaxy base
@@ -532,6 +541,13 @@ fun DrawScope.drawCosmeticBoardSurface(boardId: String, size: Size, baseColor: C
                 cornerRadius = CornerRadius(24.dp.toPx(), 24.dp.toPx())
             )
         }
+        "BOARD_PARCHMENT" -> {
+            drawRoundRect(
+                color = Color(0xFFFAF6EE),
+                size = size,
+                cornerRadius = CornerRadius(24.dp.toPx(), 24.dp.toPx())
+            )
+        }
         else -> {
             // Default Obsidian Slate
             drawRoundRect(
@@ -697,6 +713,13 @@ fun DrawScope.drawCosmeticGridSlots(
                             cornerRadius = CornerRadius(16f, 16f)
                         )
                     }
+                    "GRID_DOT_MATRIX" -> {
+                        drawCircle(
+                            color = themeDotColor.copy(alpha = 0.75f),
+                            radius = 2.dp.toPx(),
+                            center = Offset(centerX, centerY)
+                        )
+                    }
                     else -> {
                         // Default Neon Lattice
                         drawRoundRect(
@@ -822,6 +845,14 @@ fun DrawScope.drawCosmeticFrameBorder(frameId: String, size: Size, accentColor: 
                 size = size,
                 cornerRadius = CornerRadius(cornerR, cornerR),
                 style = Stroke(width = 6.dp.toPx())
+            )
+        }
+        "FRAME_CLEAN_MINIMAL" -> {
+            drawRoundRect(
+                color = Color(0xFFE5DAC8).copy(alpha = 0.5f),
+                size = size,
+                cornerRadius = CornerRadius(cornerR, cornerR),
+                style = Stroke(width = 1.dp.toPx())
             )
         }
         else -> {

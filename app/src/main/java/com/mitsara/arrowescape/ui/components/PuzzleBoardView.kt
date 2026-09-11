@@ -384,6 +384,9 @@ private val gamePalette = listOf(
 
 private fun getArrowColor(arrow: Arrow, isHinted: Boolean, theme: GameTheme): Color {
     if (isHinted) return theme.arrowHighlightColor
+    if (theme.id == "EYE_COMFORT") {
+        return theme.arrowNormalColor
+    }
     if (arrow.customColorHex != null) {
         try {
             return Color(android.graphics.Color.parseColor(arrow.customColorHex))

@@ -319,6 +319,21 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun updateCosmetic(category: String, cosmeticId: String) {
+        viewModelScope.launch {
+            repository.updateSettings { current ->
+                when (category) {
+                    "ARROW" -> current.copy(selectedArrow = cosmeticId)
+                    "BACKGROUND" -> current.copy(selectedBackground = cosmeticId)
+                    "BOARD" -> current.copy(selectedBoard = cosmeticId)
+                    "GRID" -> current.copy(selectedGrid = cosmeticId)
+                    "FRAME" -> current.copy(selectedFrame = cosmeticId)
+                    else -> current
+                }
+            }
+        }
+    }
+
     fun equipCosmetic(category: com.mitsara.arrowescape.model.CosmeticCategory, cosmeticId: String) {
         viewModelScope.launch {
             soundManager.playTapSound()

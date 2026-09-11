@@ -37,9 +37,6 @@ object PuzzleSolver {
 
         val ray = arrow.getExitRay(gridWidth, gridHeight)
         for (point in ray) {
-            if (validCells != null && validCells.isNotEmpty() && !validCells.contains(point)) {
-                return false
-            }
             if (occupiedCells.contains(point)) {
                 return false
             }
