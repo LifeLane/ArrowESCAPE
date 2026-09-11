@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.GridOn
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -72,6 +73,11 @@ import com.mitsara.arrowescape.ui.components.PuzzleBoardView
 import com.mitsara.arrowescape.ui.theme.SurfaceLight
 import com.mitsara.arrowescape.ui.viewmodel.GameViewModel
 import kotlinx.coroutines.delay
+
+import androidx.compose.material.icons.filled.NearMe
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.foundation.border
 
 @Composable
 fun GameplayScreen(
@@ -150,21 +156,6 @@ fun GameplayScreen(
                         ) {
                             Icon(Icons.Default.Palette, contentDescription = "Toggle Theme", tint = activeTheme.arrowHighlightColor, modifier = Modifier.size(22.dp))
                         }
-                        // Powerup Button
-                        if (state.powerupCharges > 0 || state.isPowerupActive) {
-                            Button(
-                                onClick = { viewModel.togglePowerup() },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (state.isPowerupActive) Color(0xFFFF3366) else activeTheme.arrowHighlightColor
-                                ),
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                                modifier = Modifier.height(32.dp).testTag("powerup_button")
-                            ) {
-                                Icon(Icons.Default.FlashOn, contentDescription = null, tint = Color.Black, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(2.dp))
-                                Text("x${state.powerupCharges}", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
                     }
 
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -182,34 +173,86 @@ fun GameplayScreen(
                         }
                     }
 
-                    IconButton(onClick = onSettingsClick, modifier = Modifier.testTag("settings_button").size(40.dp)) {
-                        Icon(Icons.Outlined.Settings, contentDescription = "Settings", tint = activeTheme.textPrimaryColor, modifier = Modifier.size(24.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        // Currency Pill (Coins & Diamonds)
+                        Row(
+                            modifier = Modifier
+                                .background(Color(0xFF0F172A).copy(alpha = 0.8f), RoundedCornerShape(12.dp))
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text("🪙", fontSize = 12.sp)
+                            Text(
+                                text = "${userSettings.coins}",
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
+                                color = Color.White
+                            )
+                        }
+                        IconButton(onClick = onSettingsClick, modifier = Modifier.testTag("settings_button").size(36.dp)) {
+                            Icon(Icons.Outlined.Settings, contentDescription = "Settings", tint = activeTheme.textPrimaryColor, modifier = Modifier.size(22.dp))
+                        }
                     }
                 }
 
-                // Smooth Animated Lives / Hearts Indicator
+                // Smooth Animated Lives / Hearts & Combo Progress Indicator
                 Row(
-                    modifier = Modifier.padding(top = 4.dp),
-                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp, start = 4.dp, end = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val maxLives = state.level.startingLives.coerceAtLeast(3)
-                    for (i in 1..maxLives) {
-                        val isAlive = i <= state.remainingLives
-                        Icon(
-                            imageVector = if (isAlive) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                            contentDescription = "Life $i",
-                            tint = if (isAlive) Color(0xFFEF4444) else Color.Gray.copy(alpha = 0.4f),
-                            modifier = Modifier
-                                .size(20.dp)
-                                .padding(horizontal = 2.dp)
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        val maxLives = state.level.startingLives.coerceAtLeast(3)
+                        for (i in 1..maxLives) {
+                            val isAlive = i <= state.remainingLives
+                            Icon(
+                                imageVector = if (isAlive) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                contentDescription = "Life $i",
+                                tint = if (isAlive) Color(0xFFEF4444) else Color.Gray.copy(alpha = 0.4f),
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .padding(horizontal = 1.dp)
+                            )
+                        }
+                        if (state.activeShieldTaps > 0) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = Color(0xFF0EA5E9).copy(alpha = 0.25f),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF38BDF8))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.Security, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(12.dp))
+                                    Spacer(modifier = Modifier.width(2.dp))
+                                    Text("${state.activeShieldTaps} Shield", color = Color(0xFF38BDF8), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
                     }
-                    Spacer(modifier = Modifier.width(12.dp))
+
+                    // Combo Multiplier Badge
+                    if (state.comboMultiplier > 1) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = Color(0xFFF59E0B),
+                            shadowElevation = 2.dp
+                        ) {
+                            Text(
+                                text = "${state.comboMultiplier}x COMBO",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, fontSize = 10.sp),
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+
                     Text(
                         text = "${state.activeArrows.size} left",
-                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold),
-                        color = activeTheme.textPrimaryColor.copy(alpha = 0.8f)
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold),
+                        color = activeTheme.textPrimaryColor.copy(alpha = 0.85f)
                     )
                 }
             }
@@ -252,14 +295,14 @@ fun GameplayScreen(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
                         .padding(start = 8.dp, bottom = 8.dp)
-                        .size(48.dp)
+                        .size(44.dp)
                         .background(activeTheme.surfaceBackgroundColor.copy(alpha = 0.9f), CircleShape)
                 ) {
                     Icon(
                         Icons.Default.GridOn,
                         contentDescription = "Toggle Grid",
                         tint = activeTheme.textPrimaryColor,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 }
 
@@ -272,7 +315,7 @@ fun GameplayScreen(
                     IconButton(
                         onClick = { viewModel.requestHint() },
                         modifier = Modifier
-                            .size(54.dp)
+                            .size(50.dp)
                             .background(activeTheme.arrowHighlightColor, CircleShape)
                             .testTag("hint_button")
                     ) {
@@ -280,7 +323,7 @@ fun GameplayScreen(
                             Icons.Default.Lightbulb,
                             contentDescription = "Hint",
                             tint = Color.White,
-                            modifier = Modifier.size(28.dp)
+                            modifier = Modifier.size(26.dp)
                         )
                     }
                     if (state.hintsAvailable > 0) {
@@ -303,12 +346,61 @@ fun GameplayScreen(
                 }
             }
 
-            // Bottom Calming Banner & Controls Strip
+            // ==========================================
+            // POWER-UP ACTION DOCK
+            // ==========================================
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = activeTheme.surfaceBackgroundColor.copy(alpha = 0.95f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF334155).copy(alpha = 0.3f)),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // 1. Laser Vaporizer
+                    val isLaserActive = state.isPowerupActive && state.selectedPowerUp == com.mitsara.arrowescape.model.PowerUpType.LASER_VAPORIZER
+                    PowerUpDockButton(
+                        title = "Laser Sweep",
+                        icon = Icons.Default.FlashOn,
+                        count = state.laserCharges,
+                        isActive = isLaserActive,
+                        activeColor = Color(0xFFFF3366),
+                        onClick = { viewModel.activatePowerUp(com.mitsara.arrowescape.model.PowerUpType.LASER_VAPORIZER) }
+                    )
+
+                    // 2. Zen Shield
+                    PowerUpDockButton(
+                        title = "Zen Shield",
+                        icon = Icons.Default.Security,
+                        count = state.shieldCharges,
+                        isActive = state.activeShieldTaps > 0,
+                        activeColor = Color(0xFF0EA5E9),
+                        onClick = { viewModel.activatePowerUp(com.mitsara.arrowescape.model.PowerUpType.ZEN_SHIELD) }
+                    )
+
+                    // 3. Sonar Burst
+                    PowerUpDockButton(
+                        title = "Sonar Burst",
+                        icon = Icons.Default.NearMe,
+                        count = state.magnetCharges,
+                        isActive = false,
+                        activeColor = Color(0xFF10B981),
+                        onClick = { viewModel.activatePowerUp(com.mitsara.arrowescape.model.PowerUpType.SONAR_MAGNET) }
+                    )
+                }
+            }
+
+            // Bottom Controls Strip (Undo & Retry)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(activeTheme.surfaceBackgroundColor.copy(alpha = 0.95f), RoundedCornerShape(20.dp))
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Row(
@@ -321,7 +413,7 @@ fun GameplayScreen(
                         enabled = state.canUndo,
                         shape = RoundedCornerShape(12.dp),
                         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                        modifier = Modifier.height(38.dp)
+                        modifier = Modifier.height(36.dp)
                     ) {
                         Icon(Icons.Default.Refresh, contentDescription = null, tint = activeTheme.textPrimaryColor, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
@@ -330,7 +422,7 @@ fun GameplayScreen(
 
                     // Calming Center Mantra Badge
                     Text(
-                        text = "EYE COMFORT • TAP TO CLEAR",
+                        text = "TAP TO ESCAPE",
                         style = MaterialTheme.typography.bodySmall.copy(
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
@@ -343,7 +435,7 @@ fun GameplayScreen(
                         onClick = { viewModel.retryLevel() },
                         shape = RoundedCornerShape(12.dp),
                         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                        modifier = Modifier.height(38.dp)
+                        modifier = Modifier.height(36.dp)
                     ) {
                         Text("Retry", color = activeTheme.textPrimaryColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
@@ -364,6 +456,8 @@ fun GameplayScreen(
                 moveCount = state.moveCount,
                 score = state.score,
                 elapsedSeconds = state.elapsedSeconds,
+                coinsEarned = if (state.earnedCoins > 0) state.earnedCoins else (50 + state.level.id * 2 + stars * 15),
+                diamondsEarned = if (state.earnedDiamonds > 0) state.earnedDiamonds else (if (state.level.id % 5 == 0) 5 else (2 + if (stars == 3) 1 else 0)),
                 theme = activeTheme,
                 onNextLevel = {
                     AdsManager.showInterstitial(context, userSettings.isPremium) {
@@ -395,7 +489,7 @@ fun GameplayScreen(
             )
         }
 
-        // Combo Banner Overlay
+        // Floating Combo Banner Overlay
         if (state.activeComboMessage != null) {
             Box(
                 modifier = Modifier
@@ -410,11 +504,36 @@ fun GameplayScreen(
                 ) {
                     Text(
                         text = state.activeComboMessage!!,
-                        style = MaterialTheme.typography.titleLarge.copy(
+                        style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Black,
                             color = Color.White
                         ),
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
+                    )
+                }
+            }
+        }
+
+        // Floating Shield Absorption Message Overlay
+        if (state.shieldTriggeredMessage != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = 160.dp),
+                contentAlignment = Alignment.TopCenter
+            ) {
+                androidx.compose.material3.Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color(0xFF0284C7),
+                    shadowElevation = 8.dp
+                ) {
+                    Text(
+                        text = state.shieldTriggeredMessage!!,
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            fontWeight = FontWeight.Black,
+                            color = Color.White
+                        ),
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
                     )
                 }
             }
@@ -428,6 +547,57 @@ fun GameplayScreen(
                     color = activeTheme.surfaceBackgroundColor,
                     radius = radius,
                     center = center
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PowerUpDockButton(
+    title: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    count: Int,
+    isActive: Boolean,
+    activeColor: Color,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(14.dp),
+        color = if (isActive) activeColor.copy(alpha = 0.25f) else Color(0xFF1E293B).copy(alpha = 0.6f),
+        border = androidx.compose.foundation.BorderStroke(
+            width = if (isActive) 2.dp else 1.dp,
+            color = if (isActive) activeColor else Color(0xFF475569).copy(alpha = 0.4f)
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = title,
+                tint = if (isActive) activeColor else Color.White,
+                modifier = Modifier.size(16.dp)
+            )
+            Column {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 10.sp
+                    ),
+                    color = if (isActive) activeColor else Color.White
+                )
+                Text(
+                    text = if (count > 0) "x$count" else "Empty",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 9.sp
+                    ),
+                    color = if (count > 0) Color(0xFF94A3B8) else Color(0xFFEF4444)
                 )
             }
         }

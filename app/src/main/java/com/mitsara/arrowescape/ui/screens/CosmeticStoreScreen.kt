@@ -86,13 +86,13 @@ fun CosmeticStoreScreen(
                 title = {
                     Column {
                         Text(
-                            text = "Cosmetics Vault",
+                            text = "Cosmetics & Power-Ups",
                             fontWeight = FontWeight.Black,
                             fontSize = 18.sp,
                             color = Color.White
                         )
                         Text(
-                            text = "Fitting Room & Customization",
+                            text = "Customization Vault & Shop",
                             style = MaterialTheme.typography.bodySmall,
                             color = Color(0xFF38BDF8)
                         )
@@ -108,28 +108,49 @@ fun CosmeticStoreScreen(
                     }
                 },
                 actions = {
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = Color(0xFF1E293B),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, GoldStar.copy(alpha = 0.6f)),
-                        modifier = Modifier.padding(end = 12.dp)
+                    Row(
+                        modifier = Modifier.padding(end = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        // Coins Pill
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFF1E293B),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.6f))
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Star,
-                                contentDescription = "Stars",
-                                tint = GoldStar,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Text(
-                                text = "${userSettings.totalStars}",
-                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black),
-                                color = Color.White
-                            )
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text("🪙", fontSize = 12.sp)
+                                Text(
+                                    text = "${userSettings.coins}",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black),
+                                    color = Color(0xFFFBBF24)
+                                )
+                            }
+                        }
+
+                        // Diamonds Pill
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFF1E293B),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF0EA5E9).copy(alpha = 0.6f))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text("💎", fontSize = 12.sp)
+                                Text(
+                                    text = "${userSettings.diamonds}",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black),
+                                    color = Color(0xFF38BDF8)
+                                )
+                            }
                         }
                     }
                 },
@@ -146,108 +167,110 @@ fun CosmeticStoreScreen(
             // =================================================================
             // TOP SECTION: INTERACTIVE LIVE FITTING ROOM STAGE
             // =================================================================
-            Card(
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF111827)),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF334155)),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+            if (selectedTab != CosmeticCategory.POWERUP) {
+                Card(
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF111827)),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF334155)),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    Column(
+                        modifier = Modifier.padding(10.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color(0xFF00E5FF), modifier = Modifier.size(16.dp))
-                            Text(
-                                text = "LIVE FITTING ROOM",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Black,
-                                letterSpacing = 1.sp,
-                                color = Color(0xFF00E5FF)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color(0xFF00E5FF), modifier = Modifier.size(16.dp))
+                                Text(
+                                    text = "LIVE FITTING ROOM",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Black,
+                                    letterSpacing = 1.sp,
+                                    color = Color(0xFF00E5FF)
+                                )
+                            }
+
+                            TextButton(
+                                onClick = {
+                                    previewArrow = userSettings.selectedArrow
+                                    previewBackground = userSettings.selectedBackground
+                                    previewBoard = userSettings.selectedBoard
+                                    previewGrid = userSettings.selectedGrid
+                                    previewFrame = userSettings.selectedFrame
+                                    activeTestArrows = testArrows
+                                },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Reset", fontSize = 11.sp, color = Color(0xFF94A3B8))
+                            }
+                        }
+
+                        // Mini Board Stage with active background
+                        Box(
+                            modifier = Modifier
+                                .size(160.dp)
+                                .padding(vertical = 4.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .border(1.dp, Color(0xFF38BDF8).copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                        ) {
+                            CosmeticBackgroundCanvas(
+                                backgroundId = previewBackground,
+                                modifier = Modifier.fillMaxSize()
+                            )
+
+                            PuzzleBoardView(
+                                gridWidth = 4,
+                                gridHeight = 4,
+                                activeArrows = activeTestArrows,
+                                animatingArrowId = animatingArrowId,
+                                animatingDirection = null,
+                                hintArrowId = null,
+                                isMistakeShake = false,
+                                onArrowClick = { tappedId ->
+                                    animatingArrowId = tappedId
+                                    scope.launch {
+                                        kotlinx.coroutines.delay(450)
+                                        animatingArrowId = null
+                                        activeTestArrows = activeTestArrows.filter { it.id != tappedId }
+                                        if (activeTestArrows.isEmpty()) {
+                                            kotlinx.coroutines.delay(300)
+                                            activeTestArrows = testArrows
+                                        }
+                                    }
+                                },
+                                selectedArrowId = previewArrow,
+                                selectedBoardId = previewBoard,
+                                selectedGridId = previewGrid,
+                                selectedFrameId = previewFrame,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(6.dp)
                             )
                         }
 
-                        TextButton(
-                            onClick = {
-                                previewArrow = userSettings.selectedArrow
-                                previewBackground = userSettings.selectedBackground
-                                previewBoard = userSettings.selectedBoard
-                                previewGrid = userSettings.selectedGrid
-                                previewFrame = userSettings.selectedFrame
-                                activeTestArrows = testArrows
-                            },
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                        // Active Preview Loadout Indicators
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.Refresh, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(14.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Reset", fontSize = 11.sp, color = Color(0xFF94A3B8))
+                            val arrowName = CosmeticsCatalog.getCosmetic(previewArrow)?.name ?: "Arrow"
+                            val bgName = CosmeticsCatalog.getCosmetic(previewBackground)?.name ?: "Background"
+                            val boardName = CosmeticsCatalog.getCosmetic(previewBoard)?.name ?: "Board"
+
+                            FittingRoomPill(label = "🏹 $arrowName")
+                            FittingRoomPill(label = "🌌 $bgName")
+                            FittingRoomPill(label = "🔲 $boardName")
                         }
-                    }
-
-                    // Mini Board Stage with active background
-                    Box(
-                        modifier = Modifier
-                            .size(180.dp)
-                            .padding(vertical = 6.dp)
-                            .clip(RoundedCornerShape(18.dp))
-                            .border(1.dp, Color(0xFF38BDF8).copy(alpha = 0.3f), RoundedCornerShape(18.dp))
-                    ) {
-                        CosmeticBackgroundCanvas(
-                            backgroundId = previewBackground,
-                            modifier = Modifier.fillMaxSize()
-                        )
-
-                        PuzzleBoardView(
-                            gridWidth = 4,
-                            gridHeight = 4,
-                            activeArrows = activeTestArrows,
-                            animatingArrowId = animatingArrowId,
-                            animatingDirection = null,
-                            hintArrowId = null,
-                            isMistakeShake = false,
-                            onArrowClick = { tappedId ->
-                                animatingArrowId = tappedId
-                                scope.launch {
-                                    kotlinx.coroutines.delay(450)
-                                    animatingArrowId = null
-                                    activeTestArrows = activeTestArrows.filter { it.id != tappedId }
-                                    if (activeTestArrows.isEmpty()) {
-                                        kotlinx.coroutines.delay(300)
-                                        activeTestArrows = testArrows
-                                    }
-                                }
-                            },
-                            selectedArrowId = previewArrow,
-                            selectedBoardId = previewBoard,
-                            selectedGridId = previewGrid,
-                            selectedFrameId = previewFrame,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(8.dp)
-                        )
-                    }
-
-                    // Active Preview Loadout Indicators
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        val arrowName = CosmeticsCatalog.getCosmetic(previewArrow)?.name ?: "Arrow"
-                        val bgName = CosmeticsCatalog.getCosmetic(previewBackground)?.name ?: "Background"
-                        val boardName = CosmeticsCatalog.getCosmetic(previewBoard)?.name ?: "Board"
-
-                        FittingRoomPill(label = "🏹 $arrowName")
-                        FittingRoomPill(label = "🌌 $bgName")
-                        FittingRoomPill(label = "🔲 $boardName")
                     }
                 }
             }
@@ -270,19 +293,19 @@ fun CosmeticStoreScreen(
                     )
 
                     Surface(
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(14.dp),
                         color = if (isSelected) Color(0xFF0F2B48) else Color(0xFF1E293B),
                         border = androidx.compose.foundation.BorderStroke(if (isSelected) 1.5.dp else 1.dp, tabColor),
                         modifier = Modifier.clickable { selectedTab = cat }
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Text(
                                 text = cat.title,
-                                fontSize = 13.sp,
+                                fontSize = 12.sp,
                                 fontWeight = if (isSelected) FontWeight.Black else FontWeight.Medium,
                                 color = if (isSelected) Color.White else Color(0xFF94A3B8)
                             )
@@ -292,9 +315,16 @@ fun CosmeticStoreScreen(
             }
 
             // =================================================================
-            // COSMETIC ITEM GRID & CARDS
+            // POWER-UP STORE / COSMETIC ITEM GRID & CARDS
             // =================================================================
-            if (selectedTab == CosmeticCategory.PRESET) {
+            if (selectedTab == CosmeticCategory.POWERUP) {
+                PowerUpStoreSection(
+                    userSettings = userSettings,
+                    onBuyPowerUp = { type, useDiamonds ->
+                        viewModel.buyPowerUp(type, useDiamonds)
+                    }
+                )
+            } else if (selectedTab == CosmeticCategory.PRESET) {
                 // Complete Sets Tab
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(1),
@@ -339,7 +369,7 @@ fun CosmeticStoreScreen(
                     CosmeticCategory.BOARD -> userSettings.selectedBoard
                     CosmeticCategory.GRID -> userSettings.selectedGrid
                     CosmeticCategory.FRAME -> userSettings.selectedFrame
-                    CosmeticCategory.PRESET -> ""
+                    CosmeticCategory.PRESET, CosmeticCategory.POWERUP -> ""
                 }
 
                 LazyVerticalGrid(
@@ -361,6 +391,8 @@ fun CosmeticStoreScreen(
                             isEquipped = isEquipped,
                             isUnlocked = isUnlocked,
                             userStars = userSettings.totalStars,
+                            userCoins = userSettings.coins,
+                            userDiamonds = userSettings.diamonds,
                             isPremium = isPremium,
                             onPreview = {
                                 when (cosmetic.category) {
@@ -369,7 +401,7 @@ fun CosmeticStoreScreen(
                                     CosmeticCategory.BOARD -> previewBoard = cosmetic.id
                                     CosmeticCategory.GRID -> previewGrid = cosmetic.id
                                     CosmeticCategory.FRAME -> previewFrame = cosmetic.id
-                                    CosmeticCategory.PRESET -> {}
+                                    CosmeticCategory.PRESET, CosmeticCategory.POWERUP -> {}
                                 }
                             },
                             onEquip = {
@@ -380,14 +412,131 @@ fun CosmeticStoreScreen(
                                     CosmeticCategory.BOARD -> previewBoard = cosmetic.id
                                     CosmeticCategory.GRID -> previewGrid = cosmetic.id
                                     CosmeticCategory.FRAME -> previewFrame = cosmetic.id
-                                    CosmeticCategory.PRESET -> {}
+                                    CosmeticCategory.PRESET, CosmeticCategory.POWERUP -> {}
                                 }
                             },
-                            onUnlock = {
+                            onUnlockWithStars = {
                                 viewModel.unlockCosmetic(cosmetic.id, cosmetic.costStars)
+                            },
+                            onUnlockWithCoins = {
+                                viewModel.unlockCosmeticWithCurrency(cosmetic.id, "COINS", cosmetic.costCoins)
                             },
                             onUnlockPremium = onPremiumClick
                         )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PowerUpStoreSection(
+    userSettings: com.mitsara.arrowescape.data.UserSettingsEntity,
+    onBuyPowerUp: (PowerUpType, Boolean) -> Unit
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(1),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+        modifier = Modifier.fillMaxSize()
+    ) {
+        items(PowerUpType.values()) { powerUp ->
+            val chargesOwned = when (powerUp) {
+                PowerUpType.LASER_VAPORIZER -> userSettings.laserCharges
+                PowerUpType.ZEN_SHIELD -> userSettings.shieldCharges
+                PowerUpType.SONAR_MAGNET -> userSettings.magnetCharges
+            }
+            val canAffordCoins = userSettings.coins >= powerUp.coinCost
+            val canAffordDiamonds = userSettings.diamonds >= powerUp.diamondCost
+
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF131D2E)),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF334155)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF0F2B48)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(powerUp.icon, fontSize = 22.sp)
+                            }
+                            Column {
+                                Text(
+                                    text = powerUp.displayName,
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 15.sp,
+                                    color = Color.White
+                                )
+                                Text(
+                                    text = "Inventory: $chargesOwned Charges",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF38BDF8)
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    Text(
+                        text = powerUp.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontSize = 12.sp,
+                        color = Color(0xFF94A3B8)
+                    )
+
+                    Spacer(Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // Buy 1 Charge with Coins
+                        Button(
+                            onClick = { onBuyPowerUp(powerUp, false) },
+                            enabled = canAffordCoins,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFF59E0B),
+                                disabledContainerColor = Color(0xFF334155)
+                            ),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                            modifier = Modifier.weight(1f).height(38.dp)
+                        ) {
+                            Text("🪙 +1 for ${powerUp.coinCost}", fontSize = 11.sp, fontWeight = FontWeight.Black, color = if (canAffordCoins) Color.Black else Color.Gray)
+                        }
+
+                        // Buy 2 Charges with Diamonds
+                        Button(
+                            onClick = { onBuyPowerUp(powerUp, true) },
+                            enabled = canAffordDiamonds,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF0284C7),
+                                disabledContainerColor = Color(0xFF334155)
+                            ),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                            modifier = Modifier.weight(1f).height(38.dp)
+                        ) {
+                            Text("💎 +2 for ${powerUp.diamondCost}", fontSize = 11.sp, fontWeight = FontWeight.Black, color = Color.White)
+                        }
                     }
                 }
             }
@@ -420,10 +569,13 @@ fun CosmeticItemCard(
     isEquipped: Boolean,
     isUnlocked: Boolean,
     userStars: Int,
+    userCoins: Int,
+    userDiamonds: Int,
     isPremium: Boolean,
     onPreview: () -> Unit,
     onEquip: () -> Unit,
-    onUnlock: () -> Unit,
+    onUnlockWithStars: () -> Unit,
+    onUnlockWithCoins: () -> Unit,
     onUnlockPremium: () -> Unit
 ) {
     val borderColor by animateColorAsState(
@@ -561,26 +713,43 @@ fun CosmeticItemCard(
                     }
                 }
                 else -> {
-                    val canAfford = userStars >= cosmetic.costStars
-                    Button(
-                        onClick = onUnlock,
-                        enabled = canAfford,
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFF59E0B),
-                            disabledContainerColor = Color(0xFF334155)
-                        ),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                        modifier = Modifier.fillMaxWidth().height(32.dp)
-                    ) {
-                        Icon(Icons.Default.Star, contentDescription = null, tint = if (canAfford) Color.Black else Color(0xFF94A3B8), modifier = Modifier.size(12.dp))
-                        Spacer(Modifier.width(3.dp))
-                        Text(
-                            text = "${cosmetic.costStars}",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Black,
-                            color = if (canAfford) Color.Black else Color(0xFF94A3B8)
-                        )
+                    val canAffordCoins = userCoins >= cosmetic.costCoins
+                    val canAffordStars = userStars >= cosmetic.costStars
+                    if (cosmetic.costCoins > 0) {
+                        Button(
+                            onClick = onUnlockWithCoins,
+                            enabled = canAffordCoins,
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFF59E0B),
+                                disabledContainerColor = Color(0xFF334155)
+                            ),
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
+                            modifier = Modifier.fillMaxWidth().height(32.dp)
+                        ) {
+                            Text("🪙 ${cosmetic.costCoins}", fontSize = 11.sp, fontWeight = FontWeight.Black, color = if (canAffordCoins) Color.Black else Color.Gray)
+                        }
+                    } else {
+                        Button(
+                            onClick = onUnlockWithStars,
+                            enabled = canAffordStars,
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFF59E0B),
+                                disabledContainerColor = Color(0xFF334155)
+                            ),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                            modifier = Modifier.fillMaxWidth().height(32.dp)
+                        ) {
+                            Icon(Icons.Default.Star, contentDescription = null, tint = if (canAffordStars) Color.Black else Color(0xFF94A3B8), modifier = Modifier.size(12.dp))
+                            Spacer(Modifier.width(3.dp))
+                            Text(
+                                text = "${cosmetic.costStars}",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Black,
+                                color = if (canAffordStars) Color.Black else Color(0xFF94A3B8)
+                            )
+                        }
                     }
                 }
             }
@@ -756,7 +925,7 @@ fun CosmeticThumbnailRenderer(cosmetic: CosmeticItem) {
                     accentColor = cosmetic.previewColors.firstOrNull() ?: Color(0xFF00E5FF)
                 )
             }
-            CosmeticCategory.PRESET -> {
+            CosmeticCategory.PRESET, CosmeticCategory.POWERUP -> {
                 drawCircle(
                     brush = Brush.radialGradient(colors = cosmetic.previewColors),
                     radius = 24.dp.toPx(),

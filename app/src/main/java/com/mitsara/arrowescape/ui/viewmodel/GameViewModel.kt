@@ -87,6 +87,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val level = LevelGenerator.getLevel(levelId)
         val initialHints = userSettings.value.hintsCount
         val autoSuggest = userSettings.value.autoFirstMoveSuggestion
+        val settings = userSettings.value
 
         val initialHintId = if (autoSuggest) {
             PuzzleSolver.getHintArrowId(
@@ -101,18 +102,93 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             level = level,
             activeArrows = level.arrows,
             remainingLives = level.startingLives,
-            hintsAvailable = if (userSettings.value.isPremium) 999 else initialHints,
-            hintArrowId = initialHintId
+            hintsAvailable = if (settings.isPremium) 999 else initialHints,
+            hintArrowId = initialHintId,
+            laserCharges = settings.laserCharges,
+            shieldCharges = settings.shieldCharges,
+            magnetCharges = settings.magnetCharges
         )
         startTimer()
     }
 
-    fun togglePowerup() {
+    fun activatePowerUp(type: com.mitsara.arrowescape.model.PowerUpType) {
         val state = _gameState.value ?: return
-        if (state.powerupCharges > 0 && !state.isCompleted && !state.isFailed) {
-            soundManager.playHintSound()
-            _gameState.update { it?.copy(isPowerupActive = !it.isPowerupActive) }
+        if (state.isCompleted || state.isFailed) return
+
+        when (type) {
+            com.mitsara.arrowescape.model.PowerUpType.LASER_VAPORIZER -> {
+                val hasCharges = userSettings.value.isPremium || state.laserCharges > 0
+                if (hasCharges) {
+                    soundManager.playHintSound()
+                    _gameState.update {
+                        it?.copy(
+                            isPowerupActive = !it.isPowerupActive,
+                            selectedPowerUp = if (!it.isPowerupActive) type else null
+                        )
+                    }
+                }
+            }
+            com.mitsara.arrowescape.model.PowerUpType.ZEN_SHIELD -> {
+                val hasCharges = userSettings.value.isPremium || state.shieldCharges > 0
+                if (hasCharges && state.activeShieldTaps <= 0) {
+                    viewModelScope.launch {
+                        repository.consumePowerUp(type)
+                        soundManager.playVictorySound()
+                        _gameState.update {
+                            it?.copy(
+                                activeShieldTaps = 2,
+                                shieldCharges = maxOf(0, it.shieldCharges - 1),
+                                shieldTriggeredMessage = "🛡️ ZEN SHIELD ACTIVE (2 Taps)"
+                            )
+                        }
+                        delay(2000)
+                        _gameState.update { it?.copy(shieldTriggeredMessage = null) }
+                    }
+                }
+            }
+            com.mitsara.arrowescape.model.PowerUpType.SONAR_MAGNET -> {
+                val hasCharges = userSettings.value.isPremium || state.magnetCharges > 0
+                if (hasCharges) {
+                    viewModelScope.launch {
+                        repository.consumePowerUp(type)
+                        soundManager.playPowerupBlastSound()
+                        _gameState.update {
+                            it?.copy(
+                                magnetCharges = maxOf(0, it.magnetCharges - 1),
+                                activeComboMessage = "🧲 SONAR BURST ENGAGED!"
+                            )
+                        }
+                        triggerSonarBurstCascade()
+                    }
+                }
+            }
         }
+    }
+
+    private suspend fun triggerSonarBurstCascade() {
+        val countToEscape = 3
+        for (i in 1..countToEscape) {
+            val state = _gameState.value ?: break
+            if (state.isCompleted || state.isFailed || state.activeArrows.isEmpty()) break
+
+            // Find an unobstructed arrow
+            val target = state.activeArrows.firstOrNull { arrow ->
+                PuzzleSolver.isArrowUnobstructed(
+                    arrow = arrow,
+                    activeArrows = state.activeArrows,
+                    gridWidth = state.level.gridWidth,
+                    gridHeight = state.level.gridHeight,
+                    obstacles = state.level.obstacles
+                )
+            } ?: state.activeArrows.firstOrNull() ?: break
+
+            onArrowTapped(target.id)
+            delay(280)
+        }
+    }
+
+    fun togglePowerup() {
+        activatePowerUp(com.mitsara.arrowescape.model.PowerUpType.LASER_VAPORIZER)
     }
 
     fun onArrowTapped(arrowId: Int) {
@@ -131,11 +207,15 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             obstacles = currentState.level.obstacles
         )
 
-        val canEscape = isUnobstructed || (currentState.isPowerupActive && currentState.powerupCharges > 0)
+        val isLaserActive = currentState.isPowerupActive && currentState.selectedPowerUp == com.mitsara.arrowescape.model.PowerUpType.LASER_VAPORIZER
+        val canEscape = isUnobstructed || isLaserActive
 
         if (canEscape) {
-            if (currentState.isPowerupActive) {
+            if (isLaserActive) {
                 soundManager.playPowerupBlastSound()
+                viewModelScope.launch {
+                    repository.consumePowerUp(com.mitsara.arrowescape.model.PowerUpType.LASER_VAPORIZER)
+                }
             } else {
                 soundManager.playEscapeSound(themeId)
             }
@@ -153,15 +233,34 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             } else {
                 1
             }
-            val comboMsg = if (newCombo > 1) "${newCombo}x COMBO!" else null
+
+            // Award bonus coins at 3x combo
+            if (newCombo >= 3 && currentState.comboMultiplier < newCombo) {
+                viewModelScope.launch {
+                    repository.addCoins(10)
+                }
+            }
+
+            // Award free power-up at 5x combo
+            if (newCombo == 5 && currentState.comboMultiplier < 5) {
+                viewModelScope.launch {
+                    repository.addPowerUp(com.mitsara.arrowescape.model.PowerUpType.LASER_VAPORIZER, 1)
+                }
+            }
+
+            val comboMsg = when (newCombo) {
+                5 -> "5x MAX COMBO! +POWERUP! ⚡"
+                4 -> "4x SUPER COMBO! 🔥"
+                3 -> "3x COMBO! +10 🪙"
+                2 -> "2x COMBO!"
+                else -> null
+            }
             val moveScore = 150 * newCombo
 
-            val usedPowerup = currentState.isPowerupActive
-            val newCharges = if (usedPowerup) maxOf(0, currentState.powerupCharges - 1) else currentState.powerupCharges
-            val earnedCharge = if (!usedPowerup && newCombo >= 5 && newCharges < 3) 1 else 0
-            val finalCharges = newCharges + earnedCharge
+            val newLaserCharges = if (isLaserActive) maxOf(0, currentState.laserCharges - 1) else currentState.laserCharges
+            val finalLaserCharges = if (newCombo >= 5) newLaserCharges + 1 else newLaserCharges
 
-            val updatedObstacles = if (usedPowerup) {
+            val updatedObstacles = if (isLaserActive) {
                 val ray = arrow.getExitRay(currentState.level.gridWidth, currentState.level.gridHeight)
                 currentState.level.obstacles.filter { obs -> !ray.contains(obs) }.toSet()
             } else {
@@ -185,11 +284,13 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                         flowCount = (state?.flowCount ?: 0) + 1,
                         moveHistory = (state?.moveHistory ?: emptyList()) + historyEntry,
                         comboMultiplier = newCombo,
+                        comboCharge = minOf(5, (state?.comboCharge ?: 0) + 1),
                         lastEscapeTimestamp = now,
                         activeComboMessage = comboMsg,
                         score = (state?.score ?: 0) + moveScore,
-                        powerupCharges = finalCharges,
+                        laserCharges = finalLaserCharges,
                         isPowerupActive = false,
+                        selectedPowerUp = null,
                         level = state.level.copy(obstacles = updatedObstacles)
                     )
                 }
@@ -210,17 +311,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     updatedState.score
                 }
 
-                _gameState.update { state ->
-                    state?.copy(
-                        activeArrows = remainingArrows,
-                        escapedArrowIds = newEscaped,
-                        animatingArrowId = null,
-                        animatingDirection = null,
-                        isCompleted = isLevelCleared,
-                        score = finalScore
-                    )
-                }
-
+                var earnedRewards = Pair(0, 0)
                 if (isLevelCleared) {
                     soundManager.playVictorySound()
                     val stars = when {
@@ -228,15 +319,47 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                         updatedState.remainingLives == 2 -> 2
                         else -> 1
                     }
-                    repository.markLevelCompleted(
+                    earnedRewards = repository.markLevelCompleted(
                         levelId = updatedState.level.id,
                         stars = stars,
                         moveCount = updatedState.moveCount
                     )
                 }
+
+                _gameState.update { state ->
+                    state?.copy(
+                        activeArrows = remainingArrows,
+                        escapedArrowIds = newEscaped,
+                        animatingArrowId = null,
+                        animatingDirection = null,
+                        isCompleted = isLevelCleared,
+                        score = finalScore,
+                        earnedCoins = earnedRewards.first,
+                        earnedDiamonds = earnedRewards.second
+                    )
+                }
             }
         } else {
-            // MISTAKE! ARROW IS BLOCKED!
+            // MISTAKE! CHECK IF ZEN SHIELD IS ACTIVE
+            if (currentState.activeShieldTaps > 0) {
+                soundManager.playHintSound()
+                val remainingShields = currentState.activeShieldTaps - 1
+                viewModelScope.launch {
+                    _gameState.update { state ->
+                        state?.copy(
+                            activeShieldTaps = remainingShields,
+                            shieldTriggeredMessage = "🛡️ ZEN SHIELD PROTECTED MISTAKE! ($remainingShields Left)"
+                        )
+                    }
+                    delay(1200)
+                    _gameState.update { state ->
+                        state?.copy(shieldTriggeredMessage = null)
+                    }
+                }
+                return
+            }
+
+            // Normal Mistake! Lost a life
             soundManager.playMistakeSound()
             val newLives = currentState.remainingLives - 1
 
@@ -249,8 +372,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                         flowCount = 0,
                         inspectedArrowId = arrowId,
                         comboMultiplier = 1,
+                        comboCharge = 0,
                         activeComboMessage = null,
-                        isPowerupActive = false
+                        isPowerupActive = false,
+                        selectedPowerUp = null
                     )
                 }
 
@@ -260,6 +385,43 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     state?.copy(isMistakeShake = false, inspectedArrowId = null)
                 }
             }
+        }
+    }
+
+    fun buyPowerUp(type: com.mitsara.arrowescape.model.PowerUpType, useDiamonds: Boolean) {
+        viewModelScope.launch {
+            val success = repository.buyPowerUp(type, useDiamonds)
+            if (success) {
+                soundManager.playVictorySound()
+                _gameState.update { state ->
+                    when (type) {
+                        com.mitsara.arrowescape.model.PowerUpType.LASER_VAPORIZER -> state?.copy(laserCharges = state.laserCharges + if (useDiamonds) 2 else 1)
+                        com.mitsara.arrowescape.model.PowerUpType.ZEN_SHIELD -> state?.copy(shieldCharges = state.shieldCharges + if (useDiamonds) 2 else 1)
+                        com.mitsara.arrowescape.model.PowerUpType.SONAR_MAGNET -> state?.copy(magnetCharges = state.magnetCharges + if (useDiamonds) 2 else 1)
+                    }
+                }
+            }
+        }
+    }
+
+    fun unlockCosmeticWithCurrency(cosmeticId: String, currencyType: String, cost: Int) {
+        viewModelScope.launch {
+            val success = repository.unlockCosmeticWithCurrency(cosmeticId, currencyType, cost)
+            if (success) {
+                soundManager.playVictorySound()
+            }
+        }
+    }
+
+    fun addBonusCoins(amount: Int) {
+        viewModelScope.launch {
+            repository.addCoins(amount)
+        }
+    }
+
+    fun addBonusDiamonds(amount: Int) {
+        viewModelScope.launch {
+            repository.addDiamonds(amount)
         }
     }
 

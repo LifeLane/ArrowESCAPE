@@ -8,7 +8,8 @@ enum class CosmeticCategory(val title: String, val iconName: String) {
     BACKGROUND("Backgrounds", "Wallpaper"),
     BOARD("Board Materials", "Dashboard"),
     GRID("Grid Matrix", "GridOn"),
-    FRAME("Frames & Borders", "CropFree")
+    FRAME("Frames & Borders", "CropFree"),
+    POWERUP("Power-Ups Vault", "FlashOn")
 }
 
 enum class CosmeticRarity(val label: String, val color: Color) {
@@ -25,6 +26,8 @@ data class CosmeticItem(
     val category: CosmeticCategory,
     val rarity: CosmeticRarity,
     val costStars: Int,
+    val costCoins: Int = if (costStars == 0) 0 else (costStars * 35),
+    val costDiamonds: Int = if (costStars == 0) 0 else maxOf(1, costStars / 8),
     val isPremiumOnly: Boolean = false,
     val description: String,
     val tagline: String,
@@ -38,6 +41,9 @@ data class CosmeticPreset(
     val name: String,
     val description: String,
     val rarity: CosmeticRarity,
+    val costStars: Int = 80,
+    val costCoins: Int = 1800,
+    val costDiamonds: Int = 30,
     val isPremiumOnly: Boolean = false,
     val arrowId: String,
     val backgroundId: String,
@@ -825,7 +831,7 @@ object CosmeticsCatalog {
             CosmeticCategory.BOARD -> boardCosmetics
             CosmeticCategory.GRID -> gridCosmetics
             CosmeticCategory.FRAME -> frameCosmetics
-            CosmeticCategory.PRESET -> emptyList()
+            CosmeticCategory.PRESET, CosmeticCategory.POWERUP -> emptyList()
         }
     }
 
@@ -836,7 +842,7 @@ object CosmeticsCatalog {
             CosmeticCategory.BOARD -> BOARD_OBSIDIAN
             CosmeticCategory.GRID -> GRID_NEON_LATTICE
             CosmeticCategory.FRAME -> FRAME_CYBER_BRACKETS
-            CosmeticCategory.PRESET -> ARROW_CYBER_NEON
+            CosmeticCategory.PRESET, CosmeticCategory.POWERUP -> ARROW_CYBER_NEON
         }
     }
 

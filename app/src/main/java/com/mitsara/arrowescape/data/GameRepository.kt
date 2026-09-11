@@ -17,8 +17,9 @@ class GameRepository(private val dao: GameDao) {
         it ?: UserSettingsEntity()
     }
 
-    suspend fun markLevelCompleted(levelId: Int, stars: Int, moveCount: Int) {
+    suspend fun markLevelCompleted(levelId: Int, stars: Int, moveCount: Int): Pair<Int, Int> {
         val existing = dao.getLevelProgress(levelId)
+        val isFirstClear = existing == null || !existing.isCompleted
         val bestStars = maxOf(existing?.stars ?: 0, stars)
         dao.saveLevelProgress(
             LevelProgressEntity(
@@ -31,14 +32,118 @@ class GameRepository(private val dao: GameDao) {
 
         val current = dao.getUserSettingsDirect() ?: UserSettingsEntity()
         val newCurrentLevel = maxOf(current.currentLevelId, levelId + 1)
-        val newTotalStars = current.totalStars + if (existing == null || !existing.isCompleted) stars else 0
+        val newTotalStars = current.totalStars + if (isFirstClear) stars else maxOf(0, stars - (existing?.stars ?: 0))
+
+        // Calculate Coins & Diamonds reward
+        val baseCoins = 50 + (levelId * 2)
+        val starBonusCoins = stars * 15
+        val earnedCoins = baseCoins + starBonusCoins
+
+        val isMilestone = levelId % 5 == 0
+        val baseDiamonds = if (isMilestone) 5 else 2
+        val starBonusDiamonds = if (stars == 3) 1 else 0
+        val earnedDiamonds = baseDiamonds + starBonusDiamonds
 
         dao.saveUserSettings(
             current.copy(
                 currentLevelId = newCurrentLevel,
-                totalStars = newTotalStars
+                totalStars = newTotalStars,
+                coins = current.coins + earnedCoins,
+                diamonds = current.diamonds + earnedDiamonds
             )
         )
+
+        return Pair(earnedCoins, earnedDiamonds)
+    }
+
+    suspend fun addCoins(amount: Int) {
+        updateSettings { it.copy(coins = it.coins + amount) }
+    }
+
+    suspend fun addDiamonds(amount: Int) {
+        updateSettings { it.copy(diamonds = it.diamonds + amount) }
+    }
+
+    suspend fun addPowerUp(type: com.mitsara.arrowescape.model.PowerUpType, count: Int = 1) {
+        updateSettings { current ->
+            when (type) {
+                com.mitsara.arrowescape.model.PowerUpType.LASER_VAPORIZER -> current.copy(laserCharges = current.laserCharges + count)
+                com.mitsara.arrowescape.model.PowerUpType.ZEN_SHIELD -> current.copy(shieldCharges = current.shieldCharges + count)
+                com.mitsara.arrowescape.model.PowerUpType.SONAR_MAGNET -> current.copy(magnetCharges = current.magnetCharges + count)
+            }
+        }
+    }
+
+    suspend fun consumePowerUp(type: com.mitsara.arrowescape.model.PowerUpType): Boolean {
+        val current = dao.getUserSettingsDirect() ?: UserSettingsEntity()
+        if (current.isPremium) return true
+        val available = when (type) {
+            com.mitsara.arrowescape.model.PowerUpType.LASER_VAPORIZER -> current.laserCharges
+            com.mitsara.arrowescape.model.PowerUpType.ZEN_SHIELD -> current.shieldCharges
+            com.mitsara.arrowescape.model.PowerUpType.SONAR_MAGNET -> current.magnetCharges
+        }
+        if (available > 0) {
+            val updated = when (type) {
+                com.mitsara.arrowescape.model.PowerUpType.LASER_VAPORIZER -> current.copy(laserCharges = current.laserCharges - 1)
+                com.mitsara.arrowescape.model.PowerUpType.ZEN_SHIELD -> current.copy(shieldCharges = current.shieldCharges - 1)
+                com.mitsara.arrowescape.model.PowerUpType.SONAR_MAGNET -> current.copy(magnetCharges = current.magnetCharges - 1)
+            }
+            dao.saveUserSettings(updated)
+            return true
+        }
+        return false
+    }
+
+    suspend fun buyPowerUp(type: com.mitsara.arrowescape.model.PowerUpType, useDiamonds: Boolean): Boolean {
+        val current = dao.getUserSettingsDirect() ?: UserSettingsEntity()
+        if (useDiamonds) {
+            if (current.diamonds >= type.costDiamonds) {
+                val updated = when (type) {
+                    com.mitsara.arrowescape.model.PowerUpType.LASER_VAPORIZER -> current.copy(diamonds = current.diamonds - type.costDiamonds, laserCharges = current.laserCharges + 2)
+                    com.mitsara.arrowescape.model.PowerUpType.ZEN_SHIELD -> current.copy(diamonds = current.diamonds - type.costDiamonds, shieldCharges = current.shieldCharges + 2)
+                    com.mitsara.arrowescape.model.PowerUpType.SONAR_MAGNET -> current.copy(diamonds = current.diamonds - type.costDiamonds, magnetCharges = current.magnetCharges + 2)
+                }
+                dao.saveUserSettings(updated)
+                return true
+            }
+        } else {
+            if (current.coins >= type.costCoins) {
+                val updated = when (type) {
+                    com.mitsara.arrowescape.model.PowerUpType.LASER_VAPORIZER -> current.copy(coins = current.coins - type.costCoins, laserCharges = current.laserCharges + 1)
+                    com.mitsara.arrowescape.model.PowerUpType.ZEN_SHIELD -> current.copy(coins = current.coins - type.costCoins, shieldCharges = current.shieldCharges + 1)
+                    com.mitsara.arrowescape.model.PowerUpType.SONAR_MAGNET -> current.copy(coins = current.coins - type.costCoins, magnetCharges = current.magnetCharges + 1)
+                }
+                dao.saveUserSettings(updated)
+                return true
+            }
+        }
+        return false
+    }
+
+    suspend fun unlockCosmeticWithCurrency(cosmeticId: String, currencyType: String, cost: Int): Boolean {
+        val current = dao.getUserSettingsDirect() ?: UserSettingsEntity()
+        val unlockedList = current.unlockedCosmetics.split(",").toMutableSet()
+        if (unlockedList.contains(cosmeticId)) return true
+
+        val canAfford = when (currencyType) {
+            "STARS" -> current.totalStars >= cost || current.isPremium || cost == 0
+            "COINS" -> current.coins >= cost || current.isPremium || cost == 0
+            "DIAMONDS" -> current.diamonds >= cost || current.isPremium || cost == 0
+            else -> false
+        }
+
+        if (canAfford) {
+            unlockedList.add(cosmeticId)
+            val updated = when (currencyType) {
+                "STARS" -> current.copy(totalStars = if (current.isPremium || cost == 0) current.totalStars else maxOf(0, current.totalStars - cost), unlockedCosmetics = unlockedList.joinToString(","))
+                "COINS" -> current.copy(coins = if (current.isPremium || cost == 0) current.coins else maxOf(0, current.coins - cost), unlockedCosmetics = unlockedList.joinToString(","))
+                "DIAMONDS" -> current.copy(diamonds = if (current.isPremium || cost == 0) current.diamonds else maxOf(0, current.diamonds - cost), unlockedCosmetics = unlockedList.joinToString(","))
+                else -> current
+            }
+            dao.saveUserSettings(updated)
+            return true
+        }
+        return false
     }
 
     suspend fun updateSettings(transform: (UserSettingsEntity) -> UserSettingsEntity) {
@@ -101,7 +206,8 @@ class GameRepository(private val dao: GameDao) {
             com.mitsara.arrowescape.model.CosmeticCategory.BOARD -> current.copy(selectedBoard = cosmeticId)
             com.mitsara.arrowescape.model.CosmeticCategory.GRID -> current.copy(selectedGrid = cosmeticId)
             com.mitsara.arrowescape.model.CosmeticCategory.FRAME -> current.copy(selectedFrame = cosmeticId)
-            com.mitsara.arrowescape.model.CosmeticCategory.PRESET -> current
+            com.mitsara.arrowescape.model.CosmeticCategory.PRESET,
+            com.mitsara.arrowescape.model.CosmeticCategory.POWERUP -> current
         }
         dao.saveUserSettings(updated)
     }
@@ -125,7 +231,8 @@ class GameRepository(private val dao: GameDao) {
                     com.mitsara.arrowescape.model.CosmeticCategory.BOARD -> updated.copy(selectedBoard = cosmeticId)
                     com.mitsara.arrowescape.model.CosmeticCategory.GRID -> updated.copy(selectedGrid = cosmeticId)
                     com.mitsara.arrowescape.model.CosmeticCategory.FRAME -> updated.copy(selectedFrame = cosmeticId)
-                    com.mitsara.arrowescape.model.CosmeticCategory.PRESET -> updated
+                    com.mitsara.arrowescape.model.CosmeticCategory.PRESET,
+                    com.mitsara.arrowescape.model.CosmeticCategory.POWERUP -> updated
                 }
             }
             dao.saveUserSettings(updated)

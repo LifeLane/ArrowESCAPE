@@ -17,6 +17,11 @@ data class UserSettingsEntity(
     @PrimaryKey val id: Int = 1,
     val currentLevelId: Int = 1,
     val hintsCount: Int = 5,
+    val coins: Int = 150,
+    val diamonds: Int = 15,
+    val laserCharges: Int = 3,
+    val shieldCharges: Int = 3,
+    val magnetCharges: Int = 3,
     val soundEnabled: Boolean = true,
     val vibrationEnabled: Boolean = true,
     val hapticLevel: String = "MEDIUM", // OFF, LIGHT, MEDIUM, HEAVY

@@ -55,6 +55,8 @@ fun LevelCompleteDialog(
     moveCount: Int,
     score: Int,
     elapsedSeconds: Int,
+    coinsEarned: Int = 50 + level.id * 2 + stars * 15,
+    diamondsEarned: Int = if (level.id % 5 == 0) 5 else (2 + if (stars == 3) 1 else 0),
     theme: GameTheme? = null,
     isGooglyMode: Boolean = theme?.id?.equals("GOOGLY", ignoreCase = true) ?: false,
     onNextLevel: () -> Unit,
@@ -67,6 +69,8 @@ fun LevelCompleteDialog(
     // Staged Animation Choreography
     var animationStage by remember { mutableIntStateOf(0) }
     var displayedScore by remember { mutableIntStateOf(0) }
+    var displayedCoins by remember { mutableIntStateOf(0) }
+    var displayedDiamonds by remember { mutableIntStateOf(0) }
     var displayedStars by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(Unit) {
@@ -81,10 +85,15 @@ fun LevelCompleteDialog(
         val targetScore = score
         val steps = 20
         for (i in 1..steps) {
-            displayedScore = (targetScore * (i.toFloat() / steps)).toInt()
+            val progress = i.toFloat() / steps
+            displayedScore = (targetScore * progress).toInt()
+            displayedCoins = (coinsEarned * progress).toInt()
+            displayedDiamonds = (diamondsEarned * progress).toInt()
             delay(15)
         }
         displayedScore = targetScore
+        displayedCoins = coinsEarned
+        displayedDiamonds = diamondsEarned
 
         // Pop stars sequentially
         for (s in 1..stars) {
@@ -277,6 +286,94 @@ fun LevelCompleteDialog(
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black, fontSize = 18.sp),
                                 color = Color(0xFF00E676)
                             )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Rewards Earned Card (Coins + Diamonds)
+                Surface(
+                    shape = RoundedCornerShape(18.dp),
+                    color = Color(0xFF1E293B).copy(alpha = 0.95f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, GoldStar.copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth(0.9f)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFF59E0B).copy(alpha = 0.2f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("🪙", fontSize = 18.sp)
+                            }
+                            Column {
+                                Text(
+                                    text = "COINS EARNED",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 9.sp,
+                                        letterSpacing = 0.5.sp
+                                    ),
+                                    color = Color(0xFF94A3B8)
+                                )
+                                Text(
+                                    text = "+$displayedCoins",
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 16.sp
+                                    ),
+                                    color = Color(0xFFFBBF24)
+                                )
+                            }
+                        }
+
+                        Box(modifier = Modifier.size(1.dp, 28.dp).background(Color(0xFF334155)))
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF0EA5E9).copy(alpha = 0.2f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("💎", fontSize = 18.sp)
+                            }
+                            Column {
+                                Text(
+                                    text = "DIAMONDS",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 9.sp,
+                                        letterSpacing = 0.5.sp
+                                    ),
+                                    color = Color(0xFF94A3B8)
+                                )
+                                Text(
+                                    text = "+$displayedDiamonds",
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 16.sp
+                                    ),
+                                    color = Color(0xFF38BDF8)
+                                )
+                            }
                         }
                     }
                 }

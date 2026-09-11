@@ -118,6 +118,46 @@ data class MoveHistoryEntry(
     val moveCount: Int
 )
 
+enum class PowerUpType(
+    val title: String,
+    val subtitle: String,
+    val iconName: String,
+    val costCoins: Int,
+    val costDiamonds: Int
+) {
+    LASER_VAPORIZER(
+        title = "Laser Sweep",
+        subtitle = "Vaporize obstacles & blast any arrow free",
+        iconName = "FlashOn",
+        costCoins = 80,
+        costDiamonds = 2
+    ),
+    ZEN_SHIELD(
+        title = "Zen Shield",
+        subtitle = "Immunity against next 2 mistake taps",
+        iconName = "Security",
+        costCoins = 60,
+        costDiamonds = 2
+    ),
+    SONAR_MAGNET(
+        title = "Sonar Burst",
+        subtitle = "Auto-escapes 3 clear arrows in cascade",
+        iconName = "NearMe",
+        costCoins = 100,
+        costDiamonds = 3
+    );
+
+    val displayName: String get() = title
+    val description: String get() = subtitle
+    val coinCost: Int get() = costCoins
+    val diamondCost: Int get() = costDiamonds
+    val icon: String get() = when (this) {
+        LASER_VAPORIZER -> "⚡"
+        ZEN_SHIELD -> "🛡️"
+        SONAR_MAGNET -> "🧲"
+    }
+}
+
 @Immutable
 data class GamePlayState(
     val level: PuzzleLevel,
@@ -139,10 +179,19 @@ data class GamePlayState(
     val elapsedSeconds: Int = 0,
     val hintCooldown: Int = 0,
     val comboMultiplier: Int = 1,
+    val comboCharge: Int = 0, // 0 to 5 fills combo gauge
     val lastEscapeTimestamp: Long = 0L,
     val activeComboMessage: String? = null,
     val powerupCharges: Int = 0,
-    val isPowerupActive: Boolean = false
+    val isPowerupActive: Boolean = false,
+    val selectedPowerUp: PowerUpType? = null,
+    val activeShieldTaps: Int = 0,
+    val laserCharges: Int = 3,
+    val shieldCharges: Int = 3,
+    val magnetCharges: Int = 3,
+    val earnedCoins: Int = 0,
+    val earnedDiamonds: Int = 0,
+    val shieldTriggeredMessage: String? = null
 ) {
     val flowState: Int get() = (flowCount / 3).coerceIn(0, 3)
     val canUndo: Boolean get() = moveHistory.isNotEmpty() && !isCompleted && !isFailed
