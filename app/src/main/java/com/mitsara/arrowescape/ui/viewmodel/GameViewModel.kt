@@ -76,7 +76,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 _gameState.update { state ->
                     if (state == null || state.isCompleted || state.isFailed) return@update state
                     val newElapsed = state.elapsedSeconds + 1
-                    val newCooldown = if (state.hintCooldown > 0) state.hintCooldown - 1 else 0
+                    val previousCooldown = state.hintCooldown
+                    val newCooldown = if (previousCooldown > 0) previousCooldown - 1 else 0
+                    if (previousCooldown == 1 && newCooldown == 0) {
+                        soundManager.playHintReadySound()
+                    }
                     state.copy(elapsedSeconds = newElapsed, hintCooldown = newCooldown)
                 }
             }
@@ -217,7 +221,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     repository.consumePowerUp(com.mitsara.arrowescape.model.PowerUpType.LASER_VAPORIZER)
                 }
             } else {
-                soundManager.playEscapeSound(themeId)
+                val now = System.currentTimeMillis()
+                val timeSinceLast = now - currentState.lastEscapeTimestamp
+                val newCombo = if (timeSinceLast < 3500L && currentState.lastEscapeTimestamp > 0L) {
+                    minOf(5, currentState.comboMultiplier + 1)
+                } else {
+                    1
+                }
+                soundManager.playEscapeArpeggio(comboMultiplier = newCombo, themeId = themeId)
             }
 
             val historyEntry = com.mitsara.arrowescape.model.MoveHistoryEntry(
@@ -232,6 +243,17 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 minOf(5, currentState.comboMultiplier + 1)
             } else {
                 1
+            }
+
+            // Accelerated hint cooldown on combos (reward for efficient chained escapes)
+            val updatedHintCooldown = if (newCombo >= 2) {
+                val reduced = maxOf(0, currentState.hintCooldown - 2)
+                if (currentState.hintCooldown > 0 && reduced == 0) {
+                    soundManager.playHintReadySound()
+                }
+                reduced
+            } else {
+                currentState.hintCooldown
             }
 
             // Award bonus coins at 3x combo
@@ -280,6 +302,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                         animatingArrowId = arrowId,
                         animatingDirection = arrow.direction,
                         hintArrowId = null,
+                        hintCooldown = updatedHintCooldown,
                         moveCount = (state?.moveCount ?: 0) + 1,
                         flowCount = (state?.flowCount ?: 0) + 1,
                         moveHistory = (state?.moveHistory ?: emptyList()) + historyEntry,
@@ -359,8 +382,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 return
             }
 
-            // Normal Mistake! Lost a life
-            soundManager.playMistakeSound()
+            // Normal Mistake! Lost a life - play satisfying tactile obstruction sound
+            soundManager.playObstructionSound(themeId)
             val newLives = currentState.remainingLives - 1
 
             viewModelScope.launch {
@@ -605,6 +628,16 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     fun addZenEscapes(count: Int) {
         viewModelScope.launch {
             repository.addZenEscapes(count)
+        }
+    }
+
+    fun claimDailyStreakReward(onClaimed: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            val success = repository.claimDailyStreakReward()
+            if (success) {
+                soundManager.playDailyRewardClaimSound()
+            }
+            onClaimed(success)
         }
     }
 }

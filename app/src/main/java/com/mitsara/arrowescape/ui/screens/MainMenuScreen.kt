@@ -46,6 +46,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mitsara.arrowescape.ui.components.AdBannerView
+import com.mitsara.arrowescape.ui.components.DailyStreakCard
 import com.mitsara.arrowescape.ui.motion.AnimatedAtmosphericBackground
 import com.mitsara.arrowescape.ui.motion.AnimatedHeroButton
 import com.mitsara.arrowescape.ui.motion.AnimatedMenuCard
@@ -61,6 +62,9 @@ fun MainMenuScreen(
     totalStars: Int,
     isPremium: Boolean,
     selectedTheme: String = "LIGHT",
+    dailyStreak: Int = 1,
+    isClaimedToday: Boolean = false,
+    onClaimDailyStreak: () -> Unit = {},
     onToggleGooglyTheme: (() -> Unit)? = null,
     onPlayClick: () -> Unit,
     onEndlessClick: () -> Unit,
@@ -242,6 +246,17 @@ fun MainMenuScreen(
                     .fillMaxWidth()
                     .height(62.dp),
                 testTag = "play_button"
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // ==========================================
+            // 3.5 DAILY STREAK MILESTONE PROGRESSION
+            // ==========================================
+            DailyStreakCard(
+                currentStreak = dailyStreak,
+                isClaimedToday = isClaimedToday,
+                onClaimReward = onClaimDailyStreak
             )
 
             Spacer(modifier = Modifier.height(16.dp))

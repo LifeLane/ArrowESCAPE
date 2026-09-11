@@ -269,17 +269,62 @@ class GameRepository(private val dao: GameDao) {
 
         calendar.add(java.util.Calendar.DAY_OF_YEAR, -1)
         val yesterday = dateFormat.format(calendar.time)
+        // If broken streak (more than 1 day missed), reset to 1
+        if (current.lastDailyCompletedDate != yesterday && current.lastDailyCompletedDate.isNotBlank()) {
+            dao.saveUserSettings(current.copy(dailyStreak = 1))
+        }
+    }
+
+    suspend fun claimDailyStreakReward(): Boolean {
+        val current = dao.getUserSettingsDirect() ?: UserSettingsEntity()
+        val dateFormat = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+        val calendar = java.util.Calendar.getInstance()
+        val today = dateFormat.format(calendar.time)
+        if (current.lastDailyCompletedDate == today) return false
+
+        calendar.add(java.util.Calendar.DAY_OF_YEAR, -1)
+        val yesterday = dateFormat.format(calendar.time)
         val newStreak = if (current.lastDailyCompletedDate == yesterday) current.dailyStreak + 1 else 1
-        val bonusHints = if (newStreak % 3 == 0) 3 else 1
+
+        val dayInCycle = ((newStreak - 1) % 7) + 1
+        val earnedCoins = when (dayInCycle) {
+            1 -> 50
+            2 -> 100
+            3 -> 150
+            4 -> 200
+            5 -> 250
+            6 -> 300
+            else -> 500
+        }
+        val earnedDiamonds = when (dayInCycle) {
+            4 -> 5
+            6 -> 10
+            7 -> 25
+            else -> 0
+        }
+        val earnedHints = when (dayInCycle) {
+            1 -> 1
+            7 -> 5
+            else -> 0
+        }
+        val bonusLaser = if (dayInCycle == 2) 1 else 0
+        val bonusShield = if (dayInCycle == 3) 1 else 0
+        val bonusSonar = if (dayInCycle == 5) 1 else 0
 
         dao.saveUserSettings(
             current.copy(
                 dailyStreak = newStreak,
                 lastDailyCompletedDate = today,
-                hintsCount = current.hintsCount + bonusHints,
-                totalStars = current.totalStars + 5
+                coins = current.coins + earnedCoins,
+                diamonds = current.diamonds + earnedDiamonds,
+                hintsCount = current.hintsCount + earnedHints,
+                laserCharges = current.laserCharges + bonusLaser,
+                shieldCharges = current.shieldCharges + bonusShield,
+                magnetCharges = current.magnetCharges + bonusSonar,
+                totalStars = current.totalStars + 10
             )
         )
+        return true
     }
 
     suspend fun saveChronoHighScore(score: Int, earnedCoins: Int, earnedDiamonds: Int) {

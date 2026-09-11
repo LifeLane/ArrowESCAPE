@@ -58,6 +58,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
+import com.mitsara.arrowescape.ui.components.RealTimeComboHUD
+import com.mitsara.arrowescape.ui.components.HintCooldownButton
 import androidx.compose.material3.ButtonDefaults
 import com.mitsara.arrowescape.engine.LevelTextEngine
 import com.mitsara.arrowescape.model.GamePlayState
@@ -233,22 +235,6 @@ fun GameplayScreen(
                         }
                     }
 
-                    // Combo Multiplier Badge
-                    if (state.comboMultiplier > 1) {
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = Color(0xFFF59E0B),
-                            shadowElevation = 2.dp
-                        ) {
-                            Text(
-                                text = "${state.comboMultiplier}x COMBO",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, fontSize = 10.sp),
-                                color = Color.White,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
-
                     Text(
                         text = "${state.activeArrows.size} left",
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold),
@@ -257,7 +243,7 @@ fun GameplayScreen(
                 }
             }
 
-            // Game Board with Floating Action Buttons (Grid toggle & Hint bulb)
+            // Game Board with Floating Action Buttons (Grid toggle & Hint cooldown button & RealTimeComboHUD)
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -285,6 +271,17 @@ fun GameplayScreen(
                     modifier = Modifier.fillMaxSize()
                 )
 
+                // Floating Real-Time Combo Multiplier HUD
+                RealTimeComboHUD(
+                    comboMultiplier = state.comboMultiplier,
+                    lastEscapeTimestamp = state.lastEscapeTimestamp,
+                    comboWindowMs = 3500L,
+                    activeComboMessage = state.activeComboMessage,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 8.dp)
+                )
+
                 // Floating Left Action: Grid / Dot Matrix Toggle
                 IconButton(
                     onClick = {
@@ -306,44 +303,18 @@ fun GameplayScreen(
                     )
                 }
 
-                // Floating Right Action: Lightbulb Hint Button with Count Badge
-                Box(
+                // Floating Right Action: Visual Hint Cooldown Button
+                HintCooldownButton(
+                    hintsAvailable = state.hintsAvailable,
+                    cooldownSeconds = state.hintCooldown,
+                    maxCooldownSeconds = 5,
+                    isPremium = userSettings.isPremium,
+                    activeColor = activeTheme.arrowHighlightColor,
+                    onClick = { viewModel.requestHint() },
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(end = 8.dp, bottom = 8.dp)
-                ) {
-                    IconButton(
-                        onClick = { viewModel.requestHint() },
-                        modifier = Modifier
-                            .size(50.dp)
-                            .background(activeTheme.arrowHighlightColor, CircleShape)
-                            .testTag("hint_button")
-                    ) {
-                        Icon(
-                            Icons.Default.Lightbulb,
-                            contentDescription = "Hint",
-                            tint = Color.White,
-                            modifier = Modifier.size(26.dp)
-                        )
-                    }
-                    if (state.hintsAvailable > 0) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .offset(x = 2.dp, y = (-2).dp)
-                                .size(20.dp)
-                                .background(Color(0xFFEF4444), CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "${state.hintsAvailable}",
-                                color = Color.White,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
+                )
             }
 
             // ==========================================

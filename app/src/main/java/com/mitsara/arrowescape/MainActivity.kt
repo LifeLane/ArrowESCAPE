@@ -95,11 +95,19 @@ fun ArrowEscapeApp(viewModel: GameViewModel) {
         }
         is Screen.MainMenu -> {
             val isGoogly = userSettings.selectedTheme.equals("GOOGLY", ignoreCase = true)
+            val todayDate = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Calendar.getInstance().time)
+            val isClaimedToday = userSettings.lastDailyCompletedDate == todayDate
+
             MainMenuScreen(
                 currentLevelId = userSettings.currentLevelId,
                 totalStars = userSettings.totalStars,
                 isPremium = userSettings.isPremium,
                 selectedTheme = userSettings.selectedTheme,
+                dailyStreak = userSettings.dailyStreak.coerceAtLeast(1),
+                isClaimedToday = isClaimedToday,
+                onClaimDailyStreak = {
+                    viewModel.claimDailyStreakReward()
+                },
                 onToggleGooglyTheme = {
                     val nextTheme = if (isGoogly) "RETRO_ARCADE" else "GOOGLY"
                     viewModel.selectTheme(nextTheme)
