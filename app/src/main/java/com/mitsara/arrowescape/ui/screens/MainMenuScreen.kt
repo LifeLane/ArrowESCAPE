@@ -141,49 +141,46 @@ fun MainMenuScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Googly Theme Mode Quick Toggle Pill
+                    // Level Roadmap Quick Button
                     Surface(
-                        color = if (isGooglyMode) Color(0xFFFF007F).copy(alpha = 0.25f) else Color(0xFF1E293B).copy(alpha = 0.85f),
+                        color = Color(0xFFFAF7EE),
                         shape = RoundedCornerShape(16.dp),
-                        border = androidx.compose.foundation.BorderStroke(
-                            1.dp,
-                            if (isGooglyMode) Color(0xFFFF007F) else Color(0xFF334155)
-                        ),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2D6C0)),
                         modifier = Modifier
                             .clip(RoundedCornerShape(16.dp))
-                            .clickable { onToggleGooglyTheme?.invoke() }
-                            .testTag("theme_mode_toggle")
+                            .clickable { onLevelSelectClick() }
+                            .testTag("menu_roadmap_button")
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                imageVector = Icons.Default.AutoAwesome,
-                                contentDescription = "Theme Mode",
-                                tint = if (isGooglyMode) Color(0xFFFF00CC) else Color(0xFF38BDF8),
+                                imageVector = Icons.Default.GridOn,
+                                contentDescription = "Roadmap",
+                                tint = Color(0xFFC5953C),
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = if (isGooglyMode) "GOOGLY" else "THEME",
+                                text = "500 LVLS",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontSize = 10.sp,
-                                    fontWeight = FontWeight.Black,
+                                    fontWeight = FontWeight.Bold,
                                     letterSpacing = 0.5.sp
                                 ),
-                                color = if (isGooglyMode) Color(0xFFFF77DD) else Color(0xFF94A3B8)
+                                color = Color(0xFF4A3525)
                             )
                         }
                     }
 
                     // Premium Crown / Star
                     Surface(
-                        color = if (isPremium) GoldStar.copy(alpha = 0.2f) else Color(0xFF1E293B).copy(alpha = 0.85f),
+                        color = if (isPremium) GoldStar.copy(alpha = 0.2f) else Color(0xFFFAF7EE),
                         shape = CircleShape,
                         border = androidx.compose.foundation.BorderStroke(
                             1.dp,
-                            if (isPremium) GoldStar else Color(0xFF334155)
+                            if (isPremium) GoldStar else Color(0xFFE2D6C0)
                         ),
                         modifier = Modifier
                             .size(38.dp)
@@ -195,7 +192,7 @@ fun MainMenuScreen(
                             Icon(
                                 imageVector = Icons.Default.Star,
                                 contentDescription = "Premium",
-                                tint = if (isPremium) GoldStar else HintGlowColor,
+                                tint = if (isPremium) GoldStar else Color(0xFFC5953C),
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -203,9 +200,9 @@ fun MainMenuScreen(
 
                     // Settings
                     Surface(
-                        color = Color(0xFF1E293B).copy(alpha = 0.85f),
+                        color = Color(0xFFFAF7EE),
                         shape = CircleShape,
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF334155)),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2D6C0)),
                         modifier = Modifier
                             .size(38.dp)
                             .clip(CircleShape)
@@ -216,7 +213,7 @@ fun MainMenuScreen(
                             Icon(
                                 imageVector = Icons.Default.Settings,
                                 contentDescription = "Settings",
-                                tint = Color(0xFFE2E8F0),
+                                tint = Color(0xFF4A3525),
                                 modifier = Modifier.size(18.dp)
                             )
                         }

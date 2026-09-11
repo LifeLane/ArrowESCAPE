@@ -544,7 +544,7 @@ private val gamePalette = listOf(
 
 private fun getArrowColor(arrow: Arrow, isHinted: Boolean, theme: GameTheme): Color {
     if (isHinted) return theme.arrowHighlightColor
-    if (theme.id == "EYE_COMFORT") {
+    if (theme.id == "EYE_COMFORT" || theme.id == "MINIMAL_WHITE" || theme.id == "ZEN_WOOD") {
         return theme.arrowNormalColor
     }
     if (arrow.customColorHex != null) {
@@ -554,7 +554,7 @@ private fun getArrowColor(arrow: Arrow, isHinted: Boolean, theme: GameTheme): Co
             // fallback
         }
     }
-    return gamePalette[(arrow.id - 1) % gamePalette.size]
+    return theme.arrowNormalColor
 }
 
 private fun DrawScope.drawEscapingArrow(
@@ -565,15 +565,15 @@ private fun DrawScope.drawEscapingArrow(
     cellHeightPx: Float,
     progress: Float,
     theme: GameTheme,
-    selectedArrowId: String = "ARROW_CYBER_NEON"
+    selectedArrowId: String = "ARROW_INK_CONTOUR"
 ) {
     val occupiedCells = arrow.getOccupiedCells()
     if (occupiedCells.isEmpty()) return
 
     val arrowColor = getArrowColor(arrow, false, theme)
-    val strokeWidth = minOf(cellWidthPx, cellHeightPx) * 0.12f
-    val headLength = minOf(cellWidthPx, cellHeightPx) * 0.35f
-    val headWidth = minOf(cellWidthPx, cellHeightPx) * 0.40f
+    val strokeWidth = minOf(cellWidthPx, cellHeightPx) * 0.16f
+    val headLength = minOf(cellWidthPx, cellHeightPx) * 0.44f
+    val headWidth = minOf(cellWidthPx, cellHeightPx) * 0.46f
 
     val waypoints = EscapePathEngine.buildEscapeWaypoints(arrow, gridWidth, gridHeight, cellWidthPx, cellHeightPx)
     val cornerRadiusPx = minOf(cellWidthPx, cellHeightPx) * 0.40f
@@ -605,50 +605,65 @@ private fun DrawScope.drawEscapingArrow(
     val tipPos = tipSample.position
     val tipAngleDeg = tipSample.angleDegrees
 
+    val isMinimalOrInk = selectedArrowId == "ARROW_INK_CONTOUR" || theme.id == "EYE_COMFORT" || theme.id == "MINIMAL_WHITE" || theme.id == "ZEN_WOOD"
+
     if (bodyRestLength > 0.01f) {
         val bodyPath = path.buildBodyPath(uTail, uTip)
 
-        val glowColor = when (selectedArrowId) {
-            "ARROW_DRAGON_FLAME" -> Color(0xFFFF5722)
-            "ARROW_PLASMA_BOLT" -> Color(0xFFC084FC)
-            "ARROW_CRYSTAL_PRISM" -> Color(0xFF38BDF8)
-            "ARROW_STEAMPUNK_BRASS" -> Color(0xFFF59E0B)
-            "ARROW_HOLOGRAM_AURA" -> Color(0xFF10B981)
-            "ARROW_GOOGLY_RAINBOW" -> Color(0xFFFF007F)
-            "ARROW_GOLDEN_ROYAL" -> Color(0xFFFBBF24)
-            "ARROW_VOID_SINGULARITY" -> Color(0xFFA855F7)
-            else -> arrowColor
+        if (isMinimalOrInk) {
+            // Crisp Solid Ink Stroke along escape path
+            drawPath(
+                path = bodyPath,
+                color = arrowColor.copy(alpha = (1f - progress * 0.4f).coerceIn(0f, 1f)),
+                style = Stroke(
+                    width = strokeWidth,
+                    cap = StrokeCap.Round,
+                    join = StrokeJoin.Round
+                )
+            )
+        } else {
+            val glowColor = when (selectedArrowId) {
+                "ARROW_DRAGON_FLAME" -> Color(0xFFFF5722)
+                "ARROW_PLASMA_BOLT" -> Color(0xFFC084FC)
+                "ARROW_CRYSTAL_PRISM" -> Color(0xFF38BDF8)
+                "ARROW_STEAMPUNK_BRASS" -> Color(0xFFF59E0B)
+                "ARROW_HOLOGRAM_AURA" -> Color(0xFF10B981)
+                "ARROW_GOOGLY_RAINBOW" -> Color(0xFFFF007F)
+                "ARROW_GOLDEN_ROYAL" -> Color(0xFFFBBF24)
+                "ARROW_VOID_SINGULARITY" -> Color(0xFFA855F7)
+                else -> arrowColor
+            }
+
+            drawPath(
+                path = bodyPath,
+                color = glowColor.copy(alpha = 0.45f),
+                style = Stroke(
+                    width = strokeWidth * 2.4f,
+                    cap = StrokeCap.Round,
+                    join = StrokeJoin.Round
+                )
+            )
+
+            drawPath(
+                path = bodyPath,
+                color = arrowColor.copy(alpha = 0.65f),
+                style = Stroke(
+                    width = strokeWidth * 0.6f,
+                    cap = StrokeCap.Round,
+                    join = StrokeJoin.Round
+                )
+            )
+
+            drawPath(
+                path = bodyPath,
+                color = Color.White.copy(alpha = 0.95f),
+                style = Stroke(
+                    width = strokeWidth * 0.8f,
+                    cap = StrokeCap.Round,
+                    join = StrokeJoin.Round
+                )
+            )
         }
-
-        drawPath(
-            path = bodyPath,
-            color = glowColor.copy(alpha = 0.45f),
-            style = Stroke(
-                width = strokeWidth * 2.4f,
-                cap = StrokeCap.Round,
-                join = StrokeJoin.Round
-            )
-        )
-
-        drawPath(
-            path = bodyPath,
-            color = arrowColor.copy(alpha = 0.65f),
-            style = Stroke(
-                width = strokeWidth * 0.6f,
-                cap = StrokeCap.Round,
-                join = StrokeJoin.Round
-            )
-        )
-
-        drawPath(
-            path = bodyPath,
-            color = Color.White.copy(alpha = 0.95f),
-            style = Stroke(
-                width = strokeWidth * 0.8f,
-                cap = StrokeCap.Round,
-                join = StrokeJoin.Round
-            )
-        )
     }
 
     rotate(degrees = tipAngleDeg, pivot = tipPos) {
@@ -658,7 +673,7 @@ private fun DrawScope.drawEscapingArrow(
             headLength = headLength,
             headWidth = headWidth,
             arrowColor = arrowColor,
-            alpha = 1.0f
+            alpha = (1f - progress * 0.4f).coerceIn(0f, 1f)
         )
     }
 
@@ -796,15 +811,15 @@ fun DrawScope.drawCosmeticArrowhead(
             drawPath(path = voidPath, color = Color(0xFFA855F7).copy(alpha = alpha * 0.9f), style = Stroke(width = 2.dp.toPx()))
         }
         else -> {
+            // Crisp Solid Geometric Arrowhead Matching Screenshots
             val headPath = Path().apply {
-                moveTo(tipPos.x, tipPos.y - headLength * 0.7f)
-                lineTo(tipPos.x - headWidth / 2, tipPos.y + headLength * 0.35f)
-                lineTo(tipPos.x, tipPos.y + headLength * 0.15f)
-                lineTo(tipPos.x + headWidth / 2, tipPos.y + headLength * 0.35f)
+                moveTo(tipPos.x, tipPos.y - headLength * 0.65f)
+                lineTo(tipPos.x - headWidth * 0.48f, tipPos.y + headLength * 0.35f)
+                lineTo(tipPos.x, tipPos.y + headLength * 0.12f)
+                lineTo(tipPos.x + headWidth * 0.48f, tipPos.y + headLength * 0.35f)
                 close()
             }
-            drawPath(path = headPath, color = arrowColor.copy(alpha = alpha * 0.6f))
-            drawPath(path = headPath, color = Color.White.copy(alpha = alpha * 0.95f))
+            drawPath(path = headPath, color = arrowColor.copy(alpha = alpha))
         }
     }
 }
@@ -821,7 +836,7 @@ private fun DrawScope.drawArrowGraphics(
     alpha: Float,
     scale: Float = 1.0f,
     theme: GameTheme,
-    selectedArrowId: String = "ARROW_CYBER_NEON"
+    selectedArrowId: String = "ARROW_INK_CONTOUR"
 ) {
     val occupiedCells = arrow.getOccupiedCells()
     if (occupiedCells.isEmpty()) return
@@ -836,9 +851,9 @@ private fun DrawScope.drawArrowGraphics(
     scale(scale = scale, pivot = arrowCenter) {
         val baseColor = getArrowColor(arrow, isHinted, theme)
         val arrowColor = if (isBlockingWarning) Color(0xFFEF4444) else baseColor
-        val strokeWidth = minOf(cellWidthPx, cellHeightPx) * 0.12f
-        val headLength = minOf(cellWidthPx, cellHeightPx) * 0.35f
-        val headWidth = minOf(cellWidthPx, cellHeightPx) * 0.40f
+        val strokeWidth = minOf(cellWidthPx, cellHeightPx) * 0.16f
+        val headLength = minOf(cellWidthPx, cellHeightPx) * 0.44f
+        val headWidth = minOf(cellWidthPx, cellHeightPx) * 0.46f
 
         val linePath = Path()
         val firstPt = occupiedCells.first()
@@ -849,54 +864,93 @@ private fun DrawScope.drawArrowGraphics(
             linePath.lineTo(pt.x * cellWidthPx + cellWidthPx / 2, pt.y * cellHeightPx + cellHeightPx / 2)
         }
 
-        val glowColor = if (isBlockingWarning) {
-            Color(0xFFEF4444)
-        } else {
-            when (selectedArrowId) {
-                "ARROW_DRAGON_FLAME" -> Color(0xFFFF5722)
-                "ARROW_PLASMA_BOLT" -> Color(0xFFC084FC)
-                "ARROW_CRYSTAL_PRISM" -> Color(0xFF38BDF8)
-                "ARROW_STEAMPUNK_BRASS" -> Color(0xFFF59E0B)
-                "ARROW_HOLOGRAM_AURA" -> Color(0xFF10B981)
-                "ARROW_GOOGLY_RAINBOW" -> Color(0xFFFF007F)
-                "ARROW_GOLDEN_ROYAL" -> Color(0xFFFBBF24)
-                "ARROW_VOID_SINGULARITY" -> Color(0xFFA855F7)
-                else -> arrowColor
+        val isMinimalOrInk = selectedArrowId == "ARROW_INK_CONTOUR" || theme.id == "EYE_COMFORT" || theme.id == "MINIMAL_WHITE" || theme.id == "ZEN_WOOD"
+
+        if (isMinimalOrInk) {
+            if (isBlockingWarning) {
+                // Outer red halo on collision mistake
+                drawPath(
+                    path = linePath,
+                    color = Color(0xFFEF4444).copy(alpha = warningAlpha * 0.35f),
+                    style = Stroke(
+                        width = strokeWidth * 2.2f,
+                        cap = StrokeCap.Round,
+                        join = StrokeJoin.Round
+                    )
+                )
+            } else if (isHinted) {
+                // Outer cyan halo on hint
+                drawPath(
+                    path = linePath,
+                    color = theme.arrowHighlightColor.copy(alpha = 0.40f * alpha),
+                    style = Stroke(
+                        width = strokeWidth * 2.2f,
+                        cap = StrokeCap.Round,
+                        join = StrokeJoin.Round
+                    )
+                )
             }
+
+            // Solid continuous ink stroke shaft
+            drawPath(
+                path = linePath,
+                color = arrowColor.copy(alpha = alpha),
+                style = Stroke(
+                    width = strokeWidth,
+                    cap = StrokeCap.Round,
+                    join = StrokeJoin.Round
+                )
+            )
+        } else {
+            val glowColor = if (isBlockingWarning) {
+                Color(0xFFEF4444)
+            } else {
+                when (selectedArrowId) {
+                    "ARROW_DRAGON_FLAME" -> Color(0xFFFF5722)
+                    "ARROW_PLASMA_BOLT" -> Color(0xFFC084FC)
+                    "ARROW_CRYSTAL_PRISM" -> Color(0xFF38BDF8)
+                    "ARROW_STEAMPUNK_BRASS" -> Color(0xFFF59E0B)
+                    "ARROW_HOLOGRAM_AURA" -> Color(0xFF10B981)
+                    "ARROW_GOOGLY_RAINBOW" -> Color(0xFFFF007F)
+                    "ARROW_GOLDEN_ROYAL" -> Color(0xFFFBBF24)
+                    "ARROW_VOID_SINGULARITY" -> Color(0xFFA855F7)
+                    else -> arrowColor
+                }
+            }
+
+            // Draw outer translucent glow aura along shaft
+            drawPath(
+                path = linePath,
+                color = glowColor.copy(alpha = if (isBlockingWarning) warningAlpha * 0.7f else alpha * 0.45f),
+                style = Stroke(
+                    width = strokeWidth * 2.4f,
+                    cap = StrokeCap.Round,
+                    join = StrokeJoin.Round
+                )
+            )
+
+            // Draw parallel fiber lines
+            drawPath(
+                path = linePath,
+                color = arrowColor.copy(alpha = alpha * 0.65f),
+                style = Stroke(
+                    width = strokeWidth * 0.6f,
+                    cap = StrokeCap.Round,
+                    join = StrokeJoin.Round
+                )
+            )
+
+            // Draw crisp inner core line shaft
+            drawPath(
+                path = linePath,
+                color = Color.White.copy(alpha = alpha * 0.95f),
+                style = Stroke(
+                    width = strokeWidth * 0.8f,
+                    cap = StrokeCap.Round,
+                    join = StrokeJoin.Round
+                )
+            )
         }
-
-        // Draw outer translucent glow aura along shaft
-        drawPath(
-            path = linePath,
-            color = glowColor.copy(alpha = if (isBlockingWarning) warningAlpha * 0.7f else alpha * 0.45f),
-            style = Stroke(
-                width = strokeWidth * 2.4f,
-                cap = StrokeCap.Round,
-                join = StrokeJoin.Round
-            )
-        )
-
-        // Draw parallel fiber lines
-        drawPath(
-            path = linePath,
-            color = arrowColor.copy(alpha = alpha * 0.65f),
-            style = Stroke(
-                width = strokeWidth * 0.6f,
-                cap = StrokeCap.Round,
-                join = StrokeJoin.Round
-            )
-        )
-
-        // Draw crisp inner core line shaft
-        drawPath(
-            path = linePath,
-            color = Color.White.copy(alpha = alpha * 0.95f),
-            style = Stroke(
-                width = strokeWidth * 0.8f,
-                cap = StrokeCap.Round,
-                join = StrokeJoin.Round
-            )
-        )
 
         val tipCell = arrow.getTipCell()
         val tipCenter = Offset(
@@ -927,11 +981,6 @@ private fun DrawScope.drawArrowGraphics(
             drawCircle(
                 color = theme.arrowHighlightColor.copy(alpha = 0.45f * alpha),
                 radius = baseRadius * 0.65f * hintScale,
-                center = tipCenter
-            )
-            drawCircle(
-                color = Color.White.copy(alpha = 0.95f * alpha),
-                radius = baseRadius * 0.35f,
                 center = tipCenter
             )
         }

@@ -56,8 +56,20 @@ data class CosmeticPreset(
 object CosmeticsCatalog {
 
     // =========================================================================
-    // 1. ARROW SKINS (10 Items)
+    // 1. ARROW SKINS (11 Items)
     // =========================================================================
+    val ARROW_INK_CONTOUR = CosmeticItem(
+        id = "ARROW_INK_CONTOUR",
+        name = "Classic Ink Contour",
+        category = CosmeticCategory.ARROW,
+        rarity = CosmeticRarity.COMMON,
+        costStars = 0,
+        description = "Crisp solid ink polyline with smooth rounded corners and geometric arrowhead, designed for maximum eye comfort.",
+        tagline = "Pure Minimalist Craft",
+        previewColors = listOf(Color(0xFF4A3525), Color(0xFF1E2238), Color(0xFFFAF7EE)),
+        glowColor = Color(0xFF00A8FF)
+    )
+
     val ARROW_CYBER_NEON = CosmeticItem(
         id = "ARROW_CYBER_NEON",
         name = "Cyber Neon Dart",
@@ -180,7 +192,7 @@ object CosmeticsCatalog {
     )
 
     val arrowCosmetics = listOf(
-        ARROW_CYBER_NEON, ARROW_CRYSTAL_PRISM, ARROW_DRAGON_FLAME, ARROW_PLASMA_BOLT,
+        ARROW_INK_CONTOUR, ARROW_CYBER_NEON, ARROW_CRYSTAL_PRISM, ARROW_DRAGON_FLAME, ARROW_PLASMA_BOLT,
         ARROW_STEAMPUNK_BRASS, ARROW_RETRO_PIXEL, ARROW_HOLOGRAM_AURA, ARROW_GOOGLY_RAINBOW,
         ARROW_GOLDEN_ROYAL, ARROW_VOID_SINGULARITY
     )

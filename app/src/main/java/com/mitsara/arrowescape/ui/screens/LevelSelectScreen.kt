@@ -68,56 +68,76 @@ fun LevelSelectScreen(
     onLevelSelected: (Int) -> Unit,
     onBackClick: () -> Unit
 ) {
-    val difficultyTabs = listOf("Easy (1-50)", "Normal (51-150)", "Hard (151-300)", "Expert (301-500)")
-    var selectedTabIndex by remember { mutableIntStateOf(0) }
+    val chapterTabs = listOf(
+        "Ch 1: Everyday (1-50)",
+        "Ch 2: Botany & Arts (51-100)",
+        "Ch 3: Maritime (101-150)",
+        "Ch 4: Relics (151-200)",
+        "Ch 5: Velocity (201-250)",
+        "Ch 6: Sorcery (251-300)",
+        "Ch 7: Crafts (301-350)",
+        "Ch 8: Geometry (351-400)",
+        "Ch 9: Cosmos (401-450)",
+        "Ch 10: Apex (451-500)"
+    )
+    var selectedTabIndex by remember { mutableIntStateOf((currentLevelId - 1) / 50) }
 
-    val levelRange = when (selectedTabIndex) {
-        0 -> 1..50
-        1 -> 51..150
-        2 -> 151..300
-        else -> 301..500
+    val levelRange = remember(selectedTabIndex) {
+        val start = selectedTabIndex * 50 + 1
+        val end = minOf(500, (selectedTabIndex + 1) * 50)
+        start..end
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = "Select Level",
-                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold)
-                    )
+                    Column {
+                        Text(
+                            text = "500 Level Roadmap",
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                            color = Color(0xFF1E293B)
+                        )
+                        Text(
+                            text = "10 Worlds • Handcrafted Silhouettes",
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                            color = Color(0xFF64748B)
+                        )
+                    }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", modifier = Modifier.size(28.dp))
+                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color(0xFF1E293B), modifier = Modifier.size(24.dp))
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceLight)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFFAF7EE))
             )
         },
-        containerColor = SurfaceLight
+        containerColor = Color(0xFFFAF7EE)
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            TabRow(
+            androidx.compose.material3.ScrollableTabRow(
                 selectedTabIndex = selectedTabIndex,
-                containerColor = SurfaceLight,
-                contentColor = PrimaryBlue,
-                divider = { Spacer(modifier = Modifier.height(1.dp).fillMaxWidth().background(Color(0xFFE2E8F0))) }
+                containerColor = Color(0xFFFAF7EE),
+                contentColor = Color(0xFFC5953C),
+                edgePadding = 16.dp,
+                divider = { Spacer(modifier = Modifier.height(1.dp).fillMaxWidth().background(Color(0xFFE2D6C0))) }
             ) {
-                difficultyTabs.forEachIndexed { index, title ->
+                chapterTabs.forEachIndexed { index, title ->
                     Tab(
                         selected = selectedTabIndex == index,
                         onClick = { selectedTabIndex = index },
                         text = {
                             Text(
-                                text = title.substringBefore(" "),
-                                style = MaterialTheme.typography.titleSmall.copy(
+                                text = title,
+                                style = MaterialTheme.typography.labelMedium.copy(
                                     fontWeight = if (selectedTabIndex == index) FontWeight.Bold else FontWeight.Medium
-                                )
+                                ),
+                                color = if (selectedTabIndex == index) Color(0xFF4A3525) else Color(0xFF78716C)
                             )
                         }
                     )
@@ -141,17 +161,26 @@ fun LevelSelectScreen(
                     val isUnlocked = isPremium || levelId <= maxUnlocked || isCompleted || levelId == 1
 
                     Surface(
-                        shape = RoundedCornerShape(20.dp),
+                        shape = RoundedCornerShape(18.dp),
                         color = when {
-                            isCurrent -> PrimaryBlue
-                            isCompleted -> Color(0xFFE0F7FA) // Light Cyan for completed
+                            isCurrent -> Color(0xFFC5953C)
+                            isCompleted -> Color(0xFFE8F5E9)
                             isUnlocked -> Color.White
-                            else -> Color(0xFFF1F5F9)
+                            else -> Color(0xFFEDE8DC)
                         },
-                        shadowElevation = if (isUnlocked && !isCurrent && !isCompleted) 4.dp else if(isCurrent) 8.dp else 0.dp,
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            when {
+                                isCurrent -> Color(0xFFB4852F)
+                                isCompleted -> Color(0xFFA5D6A7)
+                                isUnlocked -> Color(0xFFE2D6C0)
+                                else -> Color.Transparent
+                            }
+                        ),
+                        shadowElevation = if (isUnlocked && !isCurrent && !isCompleted) 2.dp else if (isCurrent) 4.dp else 0.dp,
                         modifier = Modifier
                             .aspectRatio(1f)
-                            .clip(RoundedCornerShape(20.dp))
+                            .clip(RoundedCornerShape(18.dp))
                             .clickable {
                                 if (isUnlocked) {
                                     onLevelSelected(levelId)
@@ -169,8 +198,8 @@ fun LevelSelectScreen(
                                 Icon(
                                     imageVector = Icons.Default.Lock,
                                     contentDescription = "Locked Level",
-                                    tint = TextSecondary.copy(alpha = 0.5f),
-                                    modifier = Modifier.size(24.dp)
+                                    tint = Color(0xFFA8A29E),
+                                    modifier = Modifier.size(20.dp)
                                 )
                             } else {
                                 Column(
@@ -186,8 +215,8 @@ fun LevelSelectScreen(
                                         ),
                                         color = when {
                                             isCurrent -> Color.White
-                                            isCompleted -> Color(0xFF00796B)
-                                            else -> TextPrimary
+                                            isCompleted -> Color(0xFF2E7D32)
+                                            else -> Color(0xFF4A3525)
                                         }
                                     )
                                     Text(
@@ -198,8 +227,8 @@ fun LevelSelectScreen(
                                         ),
                                         color = when {
                                             isCurrent -> Color.White.copy(alpha = 0.9f)
-                                            isCompleted -> Color(0xFF00796B).copy(alpha = 0.8f)
-                                            else -> TextSecondary
+                                            isCompleted -> Color(0xFF388E3C)
+                                            else -> Color(0xFF78716C)
                                         },
                                         maxLines = 1,
                                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
@@ -218,7 +247,7 @@ fun LevelSelectScreen(
                                                     imageVector = Icons.Default.Star,
                                                     contentDescription = null,
                                                     tint = if (s <= starsEarned) GoldStar else HeartEmptyGray,
-                                                    modifier = Modifier.size(14.dp)
+                                                    modifier = Modifier.size(13.dp)
                                                 )
                                             }
                                         }
